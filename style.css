@@ -170,3 +170,31 @@ canvas.chart { width: 100%; display: block; }
 .toast.bad { border-left-color: var(--bad); }
 .toast.warn { border-left-color: var(--warn); }
 @keyframes tin { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ---------- Inputs ---------- */
+.input { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 5px 9px; width: 130px; }
+.input:focus { outline: none; border-color: var(--accent); }
+input[type=range] { accent-color: var(--accent); }
+.list-item.sel { background: rgba(79,140,255,.06); }
+.log-line.good { color: #b9f0cf; }
+.log-line.bad { color: #ffc2c4; }
+.log-line.muted { color: var(--muted); }
+ol { padding-left: 22px; margin: 6px 0; }
+
+/* ---------- Casino ---------- */
+.casino { min-height: 320px; }
+.cz-msg { margin-top: 12px; min-height: 22px; font-size: 15px; }
+canvas.plinko { width: 100%; max-width: 640px; display: block; margin: 0 auto; }
+.slots { display: flex; justify-content: center; gap: 12px; margin: 10px 0; }
+.reel { width: 92px; height: 92px; display: flex; align-items: center; justify-content: center; font-size: 52px; background: var(--bg); border: 2px solid var(--border); border-radius: 12px; }
+.paytable { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 4px 12px; color: var(--muted); }
+.rl-ball { width: 90px; height: 90px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 34px; font-weight: 800; color: #fff; border: 4px solid #c9a227; transition: background .1s; }
+.rl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 4px; }
+.rl-n { border-width: 2px; }
+.hand { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.pcard { display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 74px; background: #f4f4f4; color: #111; border-radius: 7px; font-size: 19px; font-weight: 700; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+.pcard.red { color: #c62828; }
+.pcard.back { background: #3a4a8a; color: #9fb0f0; font-size: 40px; }
+.cr-wrap { position: relative; }
+.cr-mult { position: absolute; top: 10px; left: 0; right: 0; text-align: center; font-size: 44px; font-weight: 800; font-variant-numeric: tabular-nums; pointer-events: none; }
+.dice-roll { font-size: 52px; font-weight: 800; font-variant-numeric: tabular-nums; }
