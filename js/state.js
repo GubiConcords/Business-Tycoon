@@ -74,7 +74,9 @@ function load() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
-    return deepMerge(newState(), JSON.parse(raw));
+    const s = deepMerge(newState(), JSON.parse(raw));
+    for (const m of MODS) if (m.migrate) m.migrate(s);
+    return s;
   } catch (e) { return null; }
 }
 function wipeSave() {

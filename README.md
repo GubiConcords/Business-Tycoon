@@ -10,7 +10,7 @@ A browser business simulator. You start with **$5,000** and build an empire any 
 | 🪙 **Crypto** | 6 volatile coins, including a meme coin that can moon or get rugged |
 | 🧪 **Startups** | Angel-invest in pitches. Most fail, a few return 10–60× |
 | 🍽️ **Restaurants** | Food truck → café → diner → sushi → fine dining → burger franchise. Hire and pay cooks, waiters, cleaners and managers. Set prices and ingredient quality, run marketing, renovate, or work shifts yourself |
-| 🏭 **Factories** | A full production chain: crude oil → plastic → cups and toys; sand → wafers → chips → circuit boards and processors → smartphones, EVs, jet engines, avionics → **airliners** ✈️. Includes a commodity market, auto-buy/auto-sell and upgrades |
+| 🏭 **Factories & R&D** | Commodity plants (plastic, steel, aluminum, wire, wafers, glass, batteries, cups, toys) feed a **Design Studio** where you create your own products and pay R&D to develop them: **chips** (28nm→3nm, Efficient / Balanced / Super chip, 2–16 cores), **car engines** (I4, V6, V8, electric), **jet engines** (15k–100k lbf; turbojet, turbofan or geared), **cars**, **phones** and **aircraft** (50–600 seats, range, twin or four engines). Use your own parts or buy off-the-shelf ones (stock engines, licensed turbofans, generic chips). Most products need **certification** before production (FAA type certificate for aircraft, FAA engine certification, safety & emissions, FCC), and certification can fail. Each design needs its own production line, and the chip fab must be upgraded for smaller process nodes. Prices drop as you flood the market with one design, so a range of designs sells best |
 | 🚗 **Scrapyard** | Buy junk cars at auction, crush them for metal and parts, or repair and flip them. Rare barn finds show up now and then |
 | 🏘️ **Real estate** | Buy property, set rent levels, keep tenants happy, renovate, evict, or develop new buildings from scratch |
 | 🏎️ **Racing** | Buy and tune cars and enter races, from track days to the Grand Prix. Bet on yourself or hire a pro driver. Underground races pay more but can get raided by police |
@@ -35,7 +35,7 @@ js/util.js        helpers, modals, toasts, charts, module registry
 js/state.js       game state, money helpers, save/load
 js/markets.js     stocks, crypto, startups
 js/restaurants.js restaurants
-js/factories.js   manufacturing chain & commodity market
+js/factories.js   commodity plants, design studio, R&D, certification, product lines
 js/scrapyard.js   scrapyard
 js/realestate.js  property & landlord
 js/racing.js      racing & race betting

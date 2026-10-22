@@ -18,8 +18,12 @@ const ACH = [
   ['resto3', '🏙️', 'Food Empire', 'Own 3 restaurants at once', () => S.restaurants.length >= 3],
   ['meals', '🥘', 'Fed the City', 'Serve 25,000 meals', () => S.stats.meals >= 25000],
   ['factory', '🏭', 'Industrialist', 'Build your first factory', () => S.stats.factoriesBuilt > 0],
-  ['chips', '🔲', 'Silicon Valley', 'Produce 1,000 processors', () => (S.stats.produced_cpu || 0) >= 1000],
-  ['airliner', '✈️', 'Cleared for Takeoff', 'Build an airliner', () => S.stats.airliners > 0],
+  ['designer', '📐', 'Designer', 'Complete your first R&D project', () => S.stats.designs > 0],
+  ['chips', '🔲', 'Silicon Valley', 'Produce 1,000 of your own chips', () => (S.stats.made_chip || 0) >= 1000],
+  ['engines', '🔧', 'Engine Builder', 'Produce 100 of your own engines', () => (S.stats.made_carEngine || 0) + (S.stats.made_jetEngine || 0) >= 100],
+  ['carmaker', '🚙', 'Automaker', 'Produce 100 of your own cars', () => (S.stats.made_car || 0) >= 100],
+  ['faa', '📋', 'FAA Certified', 'Get an FAA type certificate for an aircraft', () => S.stats.faa > 0],
+  ['airliner', '✈️', 'Cleared for Takeoff', 'Build your own aircraft', () => S.stats.made_aircraft > 0],
   ['yard', '🐕', 'Junkyard Dog', 'Buy a scrapyard', () => S.yard.owned],
   ['scrap25', '🗜️', 'Crusher', 'Scrap 25 cars', () => S.stats.scrapped >= 25],
   ['flip', '🔁', 'Flipper', 'Repair & sell 5 cars', () => S.stats.flipped >= 5],
@@ -168,7 +172,7 @@ function showIntro() {
       <ul>
         <li>📈 <b>Stocks, crypto and startups</b>: invest and ride the markets</li>
         <li>🍽️ <b>Restaurants</b>: from food trucks to burger franchises. Hire, pay and manage staff.</li>
-        <li>🏭 <b>Factories</b>: build a supply chain from crude oil to chips, phones, EVs and airliners</li>
+        <li>🏭 <b>Factories &amp; R&amp;D</b>: make raw materials, then design your own chips, engines, cars, phones and aircraft. Pay for R&amp;D and certification (like an FAA type certificate), then mass-produce them</li>
         <li>🚗 <b>Scrapyard</b>: crush junk cars for metal, or fix and flip them</li>
         <li>🏘️ <b>Real estate</b>: buy, rent out, renovate and develop property</li>
         <li>🏎️ <b>Racing</b>: tune cars, win prize money, bet on yourself (underground races pay more, but the police might show up)</li>
