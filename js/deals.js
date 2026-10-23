@@ -22,6 +22,7 @@ const SUPPLY_CATS = {
   satellite: { every: 30, qty: [1, 2] },
 };
 const AI_JOBS = [
+  ['Defense logistics planning', 60], ['Satellite imagery analysis', 70],
   ['Customer-service chatbots', 30], ['Fraud detection', 45], ['Logistics optimization', 50], ['Medical imaging analysis', 60],
   ['Tax-system automation', 55], ['Weather & climate forecasting', 65], ['National cyber defense', 75], ['Drug discovery', 80],
 ];
@@ -38,7 +39,7 @@ const catRefPrice = (cat) => {
 };
 const itemName = (o) => (o.cat ? `${DCATS[o.cat].icon} ${DCATS[o.cat].name.toLowerCase()} (any of your designs)` : `${GOODS[o.item].icon} ${GOODS[o.item].name}`);
 const contractValue = (o) => (o.kind === 'ai' ? o.daily * o.days : o.qty * o.price * o.deliveries);
-const tenderChance = (o) => clamp(0.25 + rel(o.party) / 200 + S.deals.rep / 200 + Math.min(0.1, prestige() / 2000), 0.1, 0.9);
+const tenderChance = (o) => clamp(0.25 + rel(o.party) / 200 + S.deals.rep / 200 + Math.min(0.1, prestige() / 2000) + (S.world.foreign[o.party] === 'green' ? (S.co2.esg - 50) / 400 : 0) - rivalTenderPenalty(), 0.05, 0.9);
 const missionCost = (c) => Math.round(50000 * c.wealth * (hasJet() ? 0.6 : 1));
 const offerLocked = (o) => rel(o.party) < o.minRel;
 function stockFor(o) {
@@ -84,7 +85,7 @@ function makeDealOffer(ptype) {
     const useCat = ownCats.length && chance(0.6) ? pick(ownCats) : chance(0.15) ? pick(allowed) : null;
     if (useCat) {
       const sc = SUPPLY_CATS[useCat];
-      Object.assign(o, { kind: 'supply', cat: useCat, every: sc.every, qty: Math.ceil(randInt(...sc.qty) * (gov ? 1.5 : 1)), price: Math.round(catRefPrice(useCat) * rand(1.1, 1.3) * (gov ? 1.15 : 1)) });
+      Object.assign(o, { kind: 'supply', cat: useCat, every: sc.every, qty: Math.ceil(randInt(...sc.qty) * (gov ? 1.5 : 1)), price: Math.round(catRefPrice(useCat) * rand(1.1, 1.3) * (gov ? 1.15 : 1) * (['helicopter', 'tank', 'fighter', 'bomber'].includes(useCat) ? worldMult('defense') * (S.world.foreign[party] === 'hawk' ? 1.3 : 1) : 1)) });
     } else {
       const g = pick(SUPPLY_GOODS);
       Object.assign(o, { kind: 'supply', item: g, every: 1, qty: Math.max(2, Math.round(RCP[g].rate * rand(0.3, 0.8) * (gov ? scale : 1))), price: Math.round(GOODS[g].base * rand(1.15, 1.35) * (gov ? 1.1 : 1) * 100) / 100 });

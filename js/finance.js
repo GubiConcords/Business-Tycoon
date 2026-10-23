@@ -5,18 +5,20 @@
    ===================================================================== */
 const LOAN_RATE = 0.0012;     // per day
 const SAVINGS_RATE = 0.00025; // per day
-const TAX_CATS = ['Restaurants', 'Factories', 'Scrapyard', 'Real Estate', 'Racing', 'Wages', 'Marketing', 'Rent', 'Utilities', 'Insurance', 'Contracts', 'AI', 'Ventures', 'Legal', 'Space'];
+const TAX_CATS = ['Restaurants', 'Factories', 'Scrapyard', 'Real Estate', 'Racing', 'Wages', 'Marketing', 'Rent', 'Utilities', 'Insurance', 'Contracts', 'AI', 'Ventures', 'Legal', 'Space', 'Energy', 'Logistics', 'Media', 'Subsidiaries', 'Banking'];
 const TAX_MODES = {
-  honest: { name: 'Honest', icon: '😇', rate: 0.2, risk: -6, desc: 'Pay the full 20%. Audit risk slowly falls.' },
-  creative: { name: 'Creative accounting', icon: '🤫', rate: 0.12, risk: 7, desc: 'Fudge the books and pay 12%. Audit risk builds every week.' },
+  honest: { name: 'Honest', icon: '😇', rate: 0.2, risk: -6, desc: 'Pay the full government rate. Audit risk slowly falls.' },
+  creative: { name: 'Creative accounting', icon: '🤫', rate: 0.12, risk: 7, desc: 'Fudge the books and pay 8 points less. Audit risk builds every week.' },
   offshore: { name: 'Offshore shell company', icon: '🏝️', rate: 0.03, risk: 14, desc: 'Funnel profits abroad and pay 3%. Very high audit risk.' },
 };
 const SHELL_COST = 75000;
 const ACCOUNTANT_WAGE = 400;
 
+const taxRate = (mode) => (mode === 'honest' ? policy('tax') : mode === 'creative' ? Math.max(0.04, policy('tax') - 0.08) : 0.03);
 const loanLimit = () => Math.max(15000, (netWorth() + S.bank.loan) * 0.5);
 function addRisk(n) {
   if (n > 0 && S.legal && S.legal.staff.compliance) n *= 0.7;
+  if (n > 0) n *= 1 - 0.3 * execSkill('finance');
   S.tax.risk = clamp(S.tax.risk + (n > 0 && S.tax.accountant ? n * 0.5 : n), 0, 100);
 }
 function bankAmount(max) {
@@ -55,7 +57,7 @@ registerModule({
   assets(a) { a.savings = S.bank.savings; a.loan = -S.bank.loan; },
   daily() {
     const B = S.bank;
-    if (B.loan > 0) { const i = B.loan * LOAN_RATE; B.loan += i; book('Interest', -i); }
+    if (B.loan > 0) { const i = B.loan * LOAN_RATE * (1 - 0.3 * execSkill('finance')); B.loan += i; book('Interest', -i); }
     if (B.savings > 0) { const i = B.savings * SAVINGS_RATE; B.savings += i; book('Interest', i); }
     if (S.tax.accountant) spend(ACCOUNTANT_WAGE, 'Wages');
     S.tax.risk = Math.max(0, S.tax.risk - 0.15);
@@ -65,13 +67,13 @@ registerModule({
     const T = S.tax;
     for (const c of TAX_CATS) T.week += S.ledger[c] || 0;
     if (dayName() !== 'Sun') return;
-    const m = TAX_MODES[T.mode], profit = T.week;
+    const m = TAX_MODES[T.mode], profit = T.week, rate = taxRate(T.mode);
     T.week = 0;
     if (profit > 0) {
-      const bill = profit * m.rate;
+      const bill = profit * rate;
       spend(bill, 'Taxes');
       T.paid += bill;
-      T.evaded += profit * (0.2 - m.rate);
+      T.evaded += profit * (policy('tax') - rate);
       T.lastBill = { profit, bill, mode: T.mode };
       log(`🧾 Weekly taxes: ${money(bill)} on ${money(profit)} business profit (${m.name}).`);
     } else T.lastBill = { profit, bill: 0, mode: T.mode };
@@ -152,7 +154,7 @@ function renderTaxes() {
   const T = S.tax, lb = T.lastBill;
   const donateCost = Math.round(25000 + Math.max(0, netWorth()) * 0.01);
   const modes = Object.entries(TAX_MODES).map(([k, m]) => `<div class="card tight ${T.mode === k ? 'hl' : ''}">
-    <div class="row between"><b>${m.icon} ${m.name}</b><span class="pill ${k === 'honest' ? 'good' : 'bad'}">${pct(m.rate, 0)} tax</span></div>
+    <div class="row between"><b>${m.icon} ${m.name}</b><span class="pill ${k === 'honest' ? 'good' : 'bad'}">${pct(taxRate(k), 0)} tax</span></div>
     <p class="small muted" style="margin:6px 0">${m.desc}</p>
     ${T.mode === k ? '<span class="pill good">Active</span>' : btn('Switch', 'taxMode', k, { cls: 'sm', disabled: k === 'offshore' && !T.shell })}
     ${k === 'offshore' && !T.shell ? btn(`Set up shell company (${money(SHELL_COST)})`, 'buyShell', '', { cls: 'sm', disabled: !canAfford(SHELL_COST) }) : ''}</div>`).join('');

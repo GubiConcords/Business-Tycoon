@@ -215,3 +215,5 @@ canvas.plinko { width: 100%; max-width: 640px; display: block; margin: 0 auto; }
 .job-btn:disabled { background: var(--panel-2); border-color: var(--border); color: var(--muted); font-size: 16px; }
 .job-pop { position: absolute; top: 8px; color: var(--good); font-weight: 800; font-size: 18px; pointer-events: none; animation: jobpop .7s ease-out forwards; }
 @keyframes jobpop { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, -46px); } }
+.nav-group { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 10px 12px 4px; opacity: .8; }
+@media (max-width: 760px) { .nav-group { display: none; } }

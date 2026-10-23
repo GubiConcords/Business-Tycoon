@@ -88,7 +88,8 @@ function launch() {
   sp.padBusy[pad] = PAD_TURNAROUND;
   sp.launches++;
   stat('launches');
-  const pSuccess = Math.min(0.995, rocket.stats.rel + ctrlBonus()) * chanceMult;
+  addCO2('🚀 Rocket launches', rocket.stats.payload * 300);
+  const pSuccess = Math.min(0.995, rocket.stats.rel + ctrlBonus() + 0.03 * execSkill('space')) * chanceMult;
   const ok = chance(pSuccess);
   let body = '';
   if (ok) {

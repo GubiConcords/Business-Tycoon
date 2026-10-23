@@ -26,7 +26,7 @@ const LIFESTYLES = [
   { id: 'mansion', name: 'Hilltop mansion', icon: '🏰', cost: 3500, energy: 160, desc: 'Private chef, personal trainer, butler. Peak productivity.' },
 ];
 const LIFE = Object.fromEntries(LIFESTYLES.map((l) => [l.id, l]));
-const energyMax = () => (LIFE[S.life.tier] || LIFE.studio).energy + vehicleEnergyBonus();
+const energyMax = () => (LIFE[S.life.tier] || LIFE.studio).energy + vehicleEnergyBonus() + (S.meta ? (S.meta.legacyEnergy || 0) + (S.meta.trait === 'prodigy' ? 15 : 0) : 0);
 
 /* ---------------------------- Sites ---------------------------- */
 // a site is either rented (deposit held, daily rent) or owned (bought, appreciates with the housing market)
@@ -69,6 +69,9 @@ function makeBills(site, base, use = {}, insured = true, insValue = 0) {
 function payBills(b) {
   let total = 0;
   for (const [k, v] of Object.entries(b)) { spend(v, BILL_CAT[k] || 'Utilities'); total += v; }
+  if (b.elec && S.power) S.power.elecSpend += b.elec;
+  if (b.gas) addCO2('🔥 Gas for heating & kitchens', b.gas * 0.005);
+  if (b.waste) addCO2('🗑️ Waste to landfill', b.waste * 0.003);
   return total;
 }
 const billsTotal = (b) => Object.values(b || {}).reduce((s, v) => s + v, 0);
@@ -120,7 +123,7 @@ registerModule({
     }
     for (const k in S.utilRates) S.utilRates[k] = clamp(S.utilRates[k] + 0.07 * (1 - S.utilRates[k]) + 0.015 * gauss(), 0.6, 2.2);
     const l = LIFE[S.life.tier];
-    S.life.last = l.cost * (0.85 + 0.15 * (S.utilRates.elec + S.utilRates.water + S.utilRates.gas) / 3);
+    S.life.last = l.cost * (0.85 + 0.15 * (S.utilRates.elec + S.utilRates.water + S.utilRates.gas) / 3) * (S.meta && S.meta.trait === 'frugal' ? 0.5 : 1);
     if (S.life.last) spend(S.life.last, 'Living costs');
   },
   actions: {

@@ -16,6 +16,7 @@ const AI_STAFF = {
   swe: { name: 'Software engineer', icon: '👩‍💻', wage: 350, rp: 1, desc: '1 research point/day' },
   mle: { name: 'ML researcher', icon: '🧑‍🔬', wage: 900, rp: 3.5, desc: '3.5 research points/day' },
   data: { name: 'Data engineer', icon: '🗃️', wage: 400, rp: 0, data: 0.3, desc: '+0.3 data quality/day' },
+  safety: { name: 'AI safety researcher', icon: '🛡️', wage: 700, rp: 0.5, desc: 'Makes AI incidents much rarer' },
 };
 const DATASETS = [
   { id: 'web', name: 'Public web crawl', icon: '🕸️', cost: 20000, data: 10 },
@@ -47,14 +48,15 @@ const gpuPrice = () => GPU_PRICE * S.goods.chip.idx;
 const dcPF = (c) => c.gpus + c.customPF;
 const totalPF = () => S.ai.centers.reduce((t, c) => t + dcPF(c), 0);
 const aiStaffCount = () => Object.values(S.ai.staff).reduce((a, b) => a + b, 0);
-const aiWages = () => Object.entries(AI_STAFF).reduce((t, [k, r]) => t + S.ai.staff[k] * r.wage, 0);
+const aiWages = () => Object.entries(AI_STAFF).reduce((t, [k, r]) => t + (S.ai.staff[k] || 0) * r.wage, 0) * policy('wage');
 const capLabel = (c) => (c < 35 ? 'Chatbot' : c < 50 ? 'Assistant' : c < 60 ? 'Agentic' : c < 70 ? 'Expert' : c < 85 ? 'Frontier' : 'Near-AGI');
 const agentShare = (k) => (aiCap() < AGENT_SECTORS[k].min ? 0 : clamp(0.3 + (aiCap() - AGENT_SECTORS[k].min) / 30, 0, 1));
 // wage multiplier other modules apply to their payroll (computed during the previous day)
 const aiWageMult = (k) => (S.ai && S.ai.mult[k] !== undefined ? S.ai.mult[k] : 1);
 const aiDoesJob = () => S.ai.auto.job && S.ai.cover.job >= 1 && agentShare('job') > 0;
-const usersTarget = () => (aiModel() ? 120000 * Math.exp((aiCap() - 50) / 10) * (S.ai.mkt > 0 ? 1.3 : 1) : 0);
-const rpPerDay = () => Object.entries(AI_STAFF).reduce((t, [k, r]) => t + S.ai.staff[k] * r.rp, 0) * (1 + (S.ai.mult.labBoost || 0));
+const usersTarget = () => (aiModel() ? 120000 * Math.exp((aiCap() - 50) / 10) * (S.ai.mkt > 0 ? 1.3 : 1) * policy('ai') * worldMult('ai') * (S.ai.openRival > 0 ? 0.7 : 1) * (S.ai.trust || 1) : 0);
+const rpPerDay = () => Object.entries(AI_STAFF).reduce((t, [k, r]) => t + (S.ai.staff[k] || 0) * r.rp, 0) * (1 + (S.ai.mult.labBoost || 0)) * (1 + 0.3 * execSkill('tech')) * (S.meta && S.meta.trait === 'engineer' ? 1.2 : 1);
+const safetyCover = () => Math.min(0.9, (S.ai.staff.safety || 0) / 10 + 0.5 * execSkill('tech'));
 const dcValue = (c) => DCT[c.type].equip * 0.5 + c.gpus * gpuPrice() * 0.5 + c.custom * CUSTOM_SERVER_COST * 0.5 + siteValue(c.site);
 const dcById = (id) => S.ai.centers.find((c) => c.id === +id);
 function sectorWorkers(k) {
@@ -76,10 +78,10 @@ registerModule({
   id: 'ai',
   init(s) {
     s.ai = {
-      hq: null, staff: { swe: 0, mle: 0, data: 0 }, rp: 0, data: 0, datasets: {},
+      hq: null, staff: { swe: 0, mle: 0, data: 0, safety: 0 }, rp: 0, data: 0, datasets: {},
       centers: [], models: [], training: null, deployed: null, users: 0, mkt: 0,
       auto: { job: false, resto: false, yard: false, factory: false, lab: false },
-      mult: {}, cover: {}, contractOk: {}, alloc: { contracts: 0, agents: 0, serving: 0, training: 0 }, revenue: 0,
+      mult: {}, cover: {}, contractOk: {}, trust: 1, openRival: 0, incidents: 0, alloc: { contracts: 0, agents: 0, serving: 0, training: 0 }, revenue: 0,
     };
   },
   assets(a) {
@@ -100,6 +102,18 @@ registerModule({
     }
     for (const c of A.centers) { c.bills = aiBillsFor(c); payBills(c.bills); }
 
+    // AI safety, public trust and open-source competition
+    A.trust = Math.min(1, (A.trust || 1) + 0.005);
+    if (A.openRival > 0) A.openRival--;
+    if (aiModel() && aiCap() > 40 && chance(0.004 * aiCap() / 50 * (1 - safetyCover()))) {
+      const fine = Math.round(1000000 * aiCap() / 50 * legalFineMult());
+      spend(fine, 'Fines');
+      A.users *= 0.7; A.trust *= 0.85; A.incidents = (A.incidents || 0) + 1;
+      S.deals.rep = clamp(S.deals.rep - 5, 0, 100);
+      log(`⚠️ AI INCIDENT: ${esc(aiModel().name)} ${pick(['leaked private user data', 'gave dangerously wrong advice that went viral', 'was tricked into insulting a world leader', 'made up fake legal citations for a client'])}. Fine ${money(fine)}, users −30%, trust down.`, 'bad');
+      toast('⚠️ AI incident! Hire safety researchers.', 'bad');
+    }
+    if (aiModel() && !A.openRival && chance(0.003)) { A.openRival = 60; log('🔓 Sato Dynamics released a free open-source model. Your AI user growth is under pressure for 60 days.', 'warn'); }
     // compute allocation: government/business contracts → AI employees → serving users → training
     let free = totalPF();
     const alloc = { contracts: 0, agents: 0, serving: 0, training: 0 };

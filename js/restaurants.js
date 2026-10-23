@@ -34,6 +34,13 @@ const REST_SITE = {
   chain: { size: 20, site: 'a high-traffic drive-thru lot', permit: ['Franchise fee & permits', 120000] },
 };
 const restoSitePrice = (t) => t.rent * 600;
+const SIGNATURE_DISHES = ['Truffle burger', 'Smoked brisket', 'Omakase platter', 'Lobster ravioli', 'Pistachio croissant', 'Wagyu steak', 'Spicy ramen', 'Chocolate soufflé'];
+const STAR_TYPES = ['sushi', 'fine', 'diner'];
+// delivery apps, chain branding, Michelin-style stars and rival competition
+function restoExtraDemand(r) {
+  const chain = S.restaurants.filter((x) => x.type === r.type).length - 1;
+  return (r.delivery ? 1.25 : 1) * (1 + Math.min(0.3, chain * 0.04)) * (r.competition > 0 ? 0.85 : 1) * (1 + 0.15 * (r.stars || 0));
+}
 function restoBills(r, guests) {
   const t = RT[r.type], z = REST_SITE[r.type].size;
   return makeBills(r.site,
@@ -46,7 +53,7 @@ const restoById = (id) => S.restaurants.find((r) => r.id === +id);
 function restoValue(r) { return RT[r.type].cost * 0.55 * (0.6 + r.rep / 100) * (1 + 0.25 * (r.level - 1)) + siteValue(r.site); }
 function restoWages(r) {
   const wm = RT[r.type].wageMult || 1;
-  return Object.keys(ROLES).reduce((s, k) => s + r.staff[k] * ROLES[k].wage * wm, 0);
+  return Object.keys(ROLES).reduce((s, k) => s + r.staff[k] * ROLES[k].wage * wm, 0) * policy('wage');
 }
 const staffCount = (r) => Object.values(r.staff).reduce((a, b) => a + b, 0);
 const BOTTLENECK = {
@@ -71,8 +78,8 @@ registerModule({
         r.closed--;
       } else {
         const repF = 0.4 + r.rep / 60;
-        const priceF = clamp(Math.pow(t.basePrice / r.price, 1.6), 0.05, 2.5);
-        demand = t.demand * repF * priceF * (r.marketing > 0 ? 1.35 : 1) * (weekend ? 1.3 : 1) * rand(0.85, 1.15);
+        const priceF = clamp(Math.pow(t.basePrice * (1 + 0.25 * (r.stars || 0)) / r.price, 1.6), 0.05, 2.5);
+        demand = t.demand * repF * priceF * (r.marketing > 0 ? 1.35 : 1) * (weekend ? 1.3 : 1) * rand(0.85, 1.15) * worldMult('resto') * (1 + 0.15 * execSkill('resto')) * restoExtraDemand(r);
         const mgr = 1 + 0.12 * Math.min(st.manager, 2);
         const mor = 0.6 + 0.4 * r.morale / 100;
         const self = r.selfShift ? 1 : 0;
@@ -85,20 +92,26 @@ registerModule({
         revenue = served * r.price;
         ingr = served * t.ingr * q.mult;
         earn(revenue, 'Restaurants');
+        if (r.delivery) spend(revenue * 0.06, 'Restaurants');
         spend(ingr, 'Restaurants');
         stat('meals', served);
+        addCO2('🍔 Food supply chain', served * 0.0015);
 
         const needed = Math.floor(served / 150);
         r.clean = clamp(r.clean + (st.cleaner >= needed ? 5 : -8 * (needed - st.cleaner)), 0, 100);
         const ratio = demand > 0 ? served / demand : 1;
         const pr = r.price / t.basePrice;
-        let target = 45 + q.rep + (r.clean - 60) / 3 + (st.manager > 0 ? 6 : 0) + (r.level - 1) * 3 + (r.marketing > 0 ? 4 : 0);
+        let target = 45 + q.rep + (r.clean - 60) / 3 + (st.manager > 0 ? 6 : 0) + (r.level - 1) * 3 + (r.marketing > 0 ? 4 : 0) + (r.signature ? 5 : 0) + 4 * (r.stars || 0);
         if (ratio < 0.8) target -= (0.8 - ratio) * 40;
         if (pr > 1.2) target -= (pr - 1.2) * 40;
         else if (pr < 0.85) target += 5;
         r.rep = clamp(r.rep + (clamp(target, 0, 100) - r.rep) * 0.08 + gauss() * 0.8, 0, 100);
       }
       if (r.marketing > 0) r.marketing--;
+      if (dayName() === 'Sun' && STAR_TYPES.includes(r.type)) {
+        if ((r.stars || 0) < 3 && r.rep >= 85 && r.quality === 'prem' && r.clean >= 80 && chance(0.15)) { r.stars = (r.stars || 0) + 1; stat('stars'); timeline('⭐', `${r.name} earned star #${r.stars}`); log(`⭐ ${esc(r.name)} was awarded a Michelin-style star! (${r.stars}/3)`, 'good'); }
+        else if (r.stars && r.rep < 70 && chance(0.3)) { r.stars--; log(`💔 ${esc(r.name)} lost a star.`, 'bad'); }
+      }
 
       const bills = restoBills(r, served);
       payBills(bills);
@@ -190,6 +203,13 @@ registerModule({
     },
     restoBuySite(a) { buySite(restoById(a).site); },
     restoInsure(a) { const r = restoById(a); r.insured = !r.insured; },
+    restoDelivery(a) { const r = restoById(a); r.delivery = !r.delivery; },
+    restoSignature(a) {
+      const r = restoById(a), cost = RT[r.type].basePrice * 2000;
+      if (r.signature || !pay(cost, 'Restaurants', 'recipe development')) return;
+      r.signature = pick(SIGNATURE_DISHES);
+      toast(`👨‍🍳 New signature dish at ${esc(r.name)}: ${r.signature}!`, 'good');
+    },
     restoRename(a) {
       const r = restoById(a);
       const n = prompt('New restaurant name:', r.name);
@@ -234,7 +254,7 @@ function renderRestaurants() {
         <h3 style="margin:0">${esc(r.name)} <button class="btn sm" data-act="restoRename" data-a="${r.id}" title="Rename">✏️</button></h3>
         <div class="small muted">${t.name} · Level ${r.level} · ${staffCount(r)}/${t.maxStaff} staff · wages ${money(restoWages(r))}/day</div></div></div>
         <div class="row">${r.closed ? `<span class="pill bad">Closed ${r.closed}d</span>` : '<span class="pill good">Open</span>'}
-        ${r.marketing ? `<span class="pill good">📣 ${r.marketing}d</span>` : ''}${btn('Sell', 'restoSell', r.id, { cls: 'sm' })}</div></div>
+        ${r.stars ? `<span class="pill good">${'⭐'.repeat(r.stars)}</span>` : ''}${r.competition > 0 ? '<span class="pill bad">🥊 Rival nearby</span>' : ''}${r.marketing ? `<span class="pill good">📣 ${r.marketing}d</span>` : ''}${btn('Sell', 'restoSell', r.id, { cls: 'sm' })}</div></div>
       <div class="grid g2" style="margin-top:10px">
         <div>
           ${barline('Reputation', r.rep, 'var(--accent)')}${barline('Cleanliness', r.clean, '#36c2b4')}${barline('Morale', r.morale, r.morale < 30 ? 'var(--bad)' : 'var(--good)')}
@@ -259,6 +279,9 @@ function renderRestaurants() {
         ${r.level < 3 ? btn(`🔨 Renovate (${money(renoCost)})`, 'restoRenovate', r.id, { cls: 'sm', disabled: !canAfford(renoCost) }) : '<span class="pill">Max level</span>'}
         ${r.site.own ? '' : btn(`🔑 Buy premises (${money(sitePrice(r.site))})`, 'restoBuySite', r.id, { cls: 'sm', disabled: !canAfford(sitePrice(r.site)) })}
         ${btn(r.insured ? '🛡️ Insured' : '⚠️ Uninsured', 'restoInsure', r.id, { cls: 'sm ' + (r.insured ? 'on' : ''), title: 'Insurance covers most of the repair bill after fires and disasters' })}
+        ${btn(r.delivery ? '🛵 On FoodDash (+25% orders, 6% fee)' : '🛵 Join FoodDash', 'restoDelivery', r.id, { cls: 'sm ' + (r.delivery ? 'on' : '') })}
+        ${r.signature ? `<span class="pill good">👨‍🍳 ${r.signature}</span>` : btn(`👨‍🍳 Signature dish (${money(t.basePrice * 2000)})`, 'restoSignature', r.id, { cls: 'sm' })}
+        ${STAR_TYPES.includes(r.type) && !(r.stars >= 3) ? '<span class="small muted">⭐ Stars need rep 85+, premium ingredients, cleanliness 80+</span>' : ''}
       </div></div>`;
   }).join('');
 

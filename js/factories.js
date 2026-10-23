@@ -263,12 +263,12 @@ function tradeGood(g, qty) {
 
 // designed products: the more of one design you sell recently, the lower its price
 const dSat = (d, r = d.recent) => 1 / (1 + r * d.price / DCATS[d.cat].K);
-const dSellPrice = (d) => d.price * S.dmarket[d.cat] * (1 - SPREAD) * dSat(d);
+const dSellPrice = (d) => d.price * S.dmarket[d.cat] * worldMult('design') * (1 - SPREAD) * dSat(d);
 function sellDesign(d, q) {
   q = Math.min(q, d.stock);
   if (q <= 0) return 0;
   const a = d.price / DCATS[d.cat].K;
-  const rev = S.dmarket[d.cat] * (1 - SPREAD) * DCATS[d.cat].K * Math.log((1 + a * (d.recent + q)) / (1 + a * d.recent));
+  const rev = S.dmarket[d.cat] * worldMult('design') * (1 - SPREAD) * DCATS[d.cat].K * Math.log((1 + a * (d.recent + q)) / (1 + a * d.recent));
   d.recent += q; d.stock -= q; d.sold += q; d.revenue += rev;
   earn(rev, 'Factories');
   return rev;
@@ -307,7 +307,7 @@ function facRate(f) {
 }
 function facOpex(f) {
   const lvl = 1 + 0.4 * (f.level - 1), cut = f.safety === 'cut' ? 0.7 : 1;
-  const ai = aiWageMult('factory');
+  const ai = aiWageMult('factory') * policy('wage') * (1 - 0.2 * execSkill('mfg')) * (f.union ? 1.15 : 1);
   if (f.kind !== 'line') return RCP[f.good].opex * lvl * cut * ai;
   const d = facDesign(f);
   return DCATS[f.cat].opex * (d ? d.opexMult : 0.3) * lvl * cut * ai;
@@ -438,7 +438,7 @@ registerModule({
         stat('designs');
         log(`🧪 R&D complete: ${esc(d.name)} ${d.cert ? `is ready to apply for ${DCATS[d.cat].cert}.` : 'is ready for production!'}`, 'good');
         toast(`🧪 ${esc(d.name)} design complete!`, 'good');
-      } else if (chance(Math.min(0.98, d.cert.pass + regulatoryBonus()))) {
+      } else if (chance(Math.min(0.98, d.cert.pass + regulatoryBonus() + 0.1 * execSkill('space')))) {
         d.status = 'approved';
         if (d.cat === 'aircraft') stat('faa');
         log(`✅ ${esc(d.name)} received its ${DCATS[d.cat].cert}! Production can begin.`, 'good');
@@ -467,12 +467,13 @@ registerModule({
       const made = produce(f);
       chargeFacBills(f, 1, made);
       f.last.made = made;
+      if (made) addCO2('🏭 Factories', f.kind === 'line' ? made * d.price * DESIGN_CO2 : made * (GOOD_CO2[f.good] || 0));
       if (d) { d.made += made; stat('made_' + d.cat, made); }
       if (made && f.cat === 'aircraft') { log(`✈️ Your hangar rolled out ${made} ${esc(d.name)} aircraft!`, 'good'); toast(`✈️ New ${esc(d.name)} rolled out!`, 'good'); }
 
       if (f.safety === 'cut') {
         addRisk(0.25);
-        if (chance(0.007 * (S.legal.staff.compliance ? 0.6 : 1))) {
+        if (chance(0.007 * (S.legal.staff.compliance ? 0.6 : 1) * (1 - 0.5 * execSkill('mfg')))) {
           const fine = Math.round(def.cost * 0.06 * legalFineMult()), repair = Math.round(def.cost * 0.1 * (f.insured ? 0.1 : 1));
           spend(fine, 'Fines');
           spend(repair, 'Factories');

@@ -26,7 +26,7 @@ const legalPower = () => (S.legal ? LF[S.legal.firm].power + (S.legal.staff.inho
 const legalFineMult = () => Math.max(0.6, 1 - legalPower() / 175);
 const lawsuitWin = () => Math.min(0.88, 0.45 + legalPower() / 160);
 const regulatoryBonus = () => (S.legal && S.legal.staff.regulatory ? 0.1 : 0);
-const permitMult = () => (S.legal && S.legal.staff.regulatory ? 0.8 : 1);
+const permitMult = () => (S.legal && S.legal.staff.regulatory ? 0.8 : 1) * policy('permits') * officePermitMult();
 const legalFees = () => LF[S.legal.firm].fee + Object.entries(ADVISORS).reduce((t, [k, a]) => t + (S.legal.staff[k] ? a.fee : 0), 0);
 
 registerModule({

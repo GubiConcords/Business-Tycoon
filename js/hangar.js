@@ -152,6 +152,7 @@ registerModule({
       const gain = v.kind === 'car' ? 10 : 35;
       S.energy = Math.min(energyMax(), S.energy + gain);
       fl.lastTrip = S.day;
+      addCO2(v.kind === 'car' ? '🚗 Your cars' : '🛩️ Private jet flights', v.kind === 'car' ? 0.02 : 4 * v.size);
       toast(v.kind === 'car' ? `🛣️ A drive in the ${esc(v.name)} clears your head. +${gain}⚡` : `🏝️ Weekend getaway in your ${esc(v.name)}! +${gain}⚡`, 'good');
     },
   },

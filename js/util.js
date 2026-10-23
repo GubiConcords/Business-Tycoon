@@ -77,6 +77,9 @@ function registerModule(m) {
 function toast(msg, type = '') {
   const box = $('#toasts');
   if (!box) return;
+  const mode = typeof S !== 'undefined' && S && S.meta ? S.meta.notify : 'all';
+  if ((mode === 'important' && !type) || (mode === 'off' && type !== 'bad')) return;
+  if (typeof playSound === 'function') playSound(type);
   const el = document.createElement('div');
   el.className = 'toast ' + type;
   el.innerHTML = msg;

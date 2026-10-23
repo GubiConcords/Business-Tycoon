@@ -2,7 +2,7 @@
 /* =====================================================================
    Main: dashboard, log & awards, random events, day loop, rendering
    ===================================================================== */
-const TAB_ORDER = ['dash', 'job', 'stocks', 'crypto', 'startups', 'resto', 'factories', 'deals', 'ai', 'yard', 'realestate', 'fleet', 'space', 'racing', 'casino', 'bank', 'taxes', 'legal', 'log'];
+const TAB_ORDER = ['dash', 'inbox', 'stats', 'settings', 'job', 'corp', 'energy', 'logistics', 'media', 'rivals', 'people', 'politics', 'co2', 'stocks', 'crypto', 'startups', 'resto', 'factories', 'deals', 'ai', 'yard', 'realestate', 'fleet', 'space', 'racing', 'casino', 'bank', 'taxes', 'legal', 'log'];
 const HUSTLES = [
   { id: 'odd', name: 'Odd jobs', icon: '🧹', energy: 30, pay: [90, 160] },
   { id: 'deliver', name: 'Deliver food', icon: '🛵', energy: 40, pay: [140, 230] },
@@ -68,6 +68,7 @@ function checkAch() {
     try { ok = test(); } catch (e) { ok = false; }
     if (ok) {
       S.ach[id] = S.day;
+      timeline(icon, `Achievement: ${name}`);
       log(`🏅 Achievement unlocked: ${name}`, 'good');
       toast(`🏅 Achievement: <b>${icon} ${name}</b>`, 'good');
     }
@@ -171,13 +172,23 @@ function gameOver() {
   showModal({
     title: '💀 Bankrupt', cls: 'danger',
     body: `<p>Your debts have buried you. Net worth: <b class="bad">${money(netWorth())}</b> on day ${S.day}.</p><p>The bank has seized everything. Time to start over.</p>`,
-    buttons: [{ label: 'Start a new game', cls: 'primary', fn: newGame }],
+    buttons: [{ label: 'Start a new game', cls: 'primary', fn: askNewGameOptions }],
   });
 }
-function newGame() {
+function newGame(opts = {}) {
   wipeSave();
   S = newState();
-  for (const m of MODS) if (m.start) m.start();
+  const m = S.meta, L = legacy();
+  m.difficulty = opts.difficulty || 'normal';
+  m.scenario = opts.scenario || 'sandbox';
+  m.guided = opts.guided !== 'off';
+  S.cash = DIFFICULTY[m.difficulty].cash + L.points * 1000;
+  m.legacyEnergy = Math.min(20, L.points);
+  S.history = [S.cash];
+  for (const md of MODS) if (md.start) md.start();
+  if (SCENARIOS[m.scenario].setup) SCENARIOS[m.scenario].setup();
+  timeline('🎬', `New game: ${SCENARIOS[m.scenario].name} (${DIFFICULTY[m.difficulty].name})`);
+  if (m.difficulty === 'hard') startWorldEvent('recession');
   UI.gameOver = false;
   UI.tab = 'dash';
   save();
@@ -186,7 +197,7 @@ function newGame() {
 function showIntro() {
   showModal({
     title: '💼 Welcome to Business Tycoon',
-    body: `<p>You start with <b>${money(START_CASH)}</b>. How you get rich is up to you:</p>
+    body: `<p>You start with <b>${money(S.cash)}</b>. How you get rich is up to you:</p>
       <ul>
         <li>📈 <b>Stocks, crypto and startups</b>: invest and ride the markets</li>
         <li>🍽️ <b>Restaurants</b>: from food trucks to burger franchises. Hire, pay and manage staff.</li>
@@ -202,6 +213,10 @@ function showIntro() {
         <li>🎖️ <b>Defense</b>: design and build helicopters, tanks, fighter jets and bombers, plus all their parts</li>
         <li>🚀 <b>Space agency</b>: rockets, satellites, space tourism, a space station, the Moon and Mars</li>
         <li>⚖️ <b>Legal &amp; advisors</b>: hire better lawyers and specialists to cut fines and win lawsuits</li>
+        <li>⚡ <b>Energy</b>: solar, wind, hydro, gas, coal, nuclear and fusion, plus oil wells and gas fields. 🌱 Watch your <b>CO₂ emissions</b> and the carbon price.</li>
+        <li>🏛️ <b>Corporate</b>: take your company public, take over listed companies, found a bank. 🥊 Beat four <b>rival tycoons</b>.</li>
+        <li>🌍 <b>World &amp; politics</b>: pandemics, wars, recessions and elections. Fund parties or run for President yourself.</li>
+        <li>🚢 <b>Logistics</b>, 👔 <b>executives</b>, 📺 <b>media empire</b>, and your 👑 <b>dynasty</b>: you age, and your heirs carry on.</li>
         <li>💼 <b>A 9–5 job</b>: click to work, starting at 1¢ per click. Get promoted up to 40¢.</li>
         <li>🏢 <b>Running costs</b>: every business needs premises (rent or buy), a permit, and pays for electricity, water, gas, internet, waste and insurance. You also pay your own living costs.</li>
       </ul>
@@ -234,6 +249,7 @@ function renderDash() {
     <div class="card"><h3>Yesterday's cash flow</h3>${led.length ? `<table><tbody>${led.map(([k, v]) => `<tr><td>${k}</td><td class="num ${cls(v)}">${signMoney(v)}</td></tr>`).join('')}
       <tr><td><b>Total</b></td><td class="num ${cls(net)}"><b>${signMoney(net)}</b></td></tr></tbody></table>` : '<p class="muted">Nothing yet. Wait for the day to end.</p>'}</div>
   </div>
+  <div class="grid g2 section">${renderQuest()}${renderAttention()}</div>
   <div class="grid g2 section">${renderLiving()}</div>
   <div class="grid g2">
     <div class="card"><h3>Assets</h3>${alloc.map(([k, v]) => `<div class="barline" style="grid-template-columns:100px 1fr 90px"><span class="muted">${ASSET_LABELS[k] || k}</span>${bar(Math.max(0, v) / gross * 100, v < 0 ? 'var(--bad)' : 'var(--accent)')}<span class="num right ${v < 0 ? 'bad' : ''}">${money(v)}</span></div>`).join('')}</div>
@@ -274,15 +290,11 @@ registerModule({
       if (!useEnergy(h.energy)) return;
       const v = randInt(...h.pay);
       earn(v, 'Hustles');
+      stat('hustles');
       toast(`${h.icon} You earned ${money(v)}.`, 'good');
     },
     saveGame() { save(); toast('Game saved.', 'good'); },
-    askNewGame() {
-      showModal({
-        title: 'Start a new game?', body: '<p>This erases your current progress.</p>',
-        buttons: [{ label: 'Yes, start over', cls: 'danger', fn: newGame }, { label: 'Cancel' }],
-      });
-    },
+    askNewGame() { askNewGameOptions(); },
   },
 });
 
@@ -295,16 +307,31 @@ function renderTop() {
     <div class="stat"><span class="lbl">Net worth</span><span class="val">${money(nw)}</span></div>
     <div class="stat"><span class="lbl">Energy ${S.energy}/${energyMax()}⚡</span><div class="meter"><div style="width:${S.energy / energyMax() * 100}%;background:var(--energy)"></div></div></div>
     <div class="stat"><span class="lbl">Audit risk ${Math.round(risk)}%</span><div class="meter"><div style="width:${risk}%;background:var(--heat)"></div></div></div>
+    <span class="pill ${unreadCount() ? 'warn' : ''}" data-act="tab" data-a="inbox" style="cursor:pointer">📬 ${unreadCount()}</span>
+    ${S.world.event ? `<span class="pill bad" data-act="tab" data-a="politics" style="cursor:pointer">${WORLD_EVENTS[S.world.event].icon} ${WORLD_EVENTS[S.world.event].name}</span>` : ''}
     ${S.job.clockedIn ? `<span class="pill warn" data-act="tab" data-a="job" style="cursor:pointer">💼 At work: ${jobClock()}, time paused</span>` : ''}
     <div class="top-controls">${seg([[0, '⏸'], [1, '▶'], [2, '▶▶'], [3, '▶▶▶'], [4, '⚡']], S.speed, 'speed')}${btn('Next day ⏭', 'nextDay', '', { cls: 'sm' })}</div>`;
 }
 function renderNav() {
-  $('#nav').innerHTML = TABS.map((t) => `<button class="${t.id === UI.tab ? 'active' : ''}" data-act="tab" data-a="${t.id}"><span class="ico">${t.icon}</span>${t.name}</button>`).join('');
+  const seen = new Set(), visible = (t) => tabUnlocked(t.id);
+  const item = (t) => `<button class="${t.id === UI.tab ? 'active' : ''}" data-act="tab" data-a="${t.id}"><span class="ico">${t.icon}</span>${t.name}</button>`;
+  let html = '';
+  for (const [g, ids] of TAB_GROUPS) {
+    const ts = ids.map((id) => TABS.find((t) => t.id === id)).filter((t) => t && visible(t));
+    ids.forEach((id) => seen.add(id));
+    if (ts.length) html += `<div class="nav-group">${g}</div>${ts.map(item).join('')}`;
+  }
+  const rest = TABS.filter((t) => !seen.has(t.id) && visible(t));
+  if (rest.length) html += `<div class="nav-group">More</div>${rest.map(item).join('')}`;
+  const locked = TABS.filter((t) => !visible(t)).length;
+  if (locked) html += `<div class="nav-group">🔒 ${locked} more tabs unlock as you progress</div>`;
+  $('#nav').innerHTML = html;
 }
 function render(force = false) {
   if (UI.pointerDown) { UI.pending = true; return; }
   renderTop();
   renderNav();
+  if (!tabUnlocked(UI.tab)) UI.tab = 'dash';
   const tab = TABS.find((t) => t.id === UI.tab) || TABS[0];
   if (!force && tab.live === false && UI.shown === tab.id) { if (tab.tick) tab.tick(); return; }
   const main = $('#main');
@@ -345,6 +372,7 @@ TABS.sort((a, b) => TAB_ORDER.indexOf(a.id) - TAB_ORDER.indexOf(b.id));
 S = load();
 if (!S) {
   S = newState();
+  S.meta.guided = true;
   for (const m of MODS) if (m.start) m.start();
 }
 render(true);

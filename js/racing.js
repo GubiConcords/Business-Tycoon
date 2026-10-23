@@ -70,6 +70,7 @@ function runRace(evId) {
   if (bet) spend(bet, 'Gambling');
   R.events.splice(R.events.indexOf(ev), 1);
   stat('races');
+  addCO2('🏎️ Racing', 0.1);
 
   if (t.illegal && chance(0.12)) {
     const fine = Math.round((10000 + t.entry * 2) * legalFineMult());

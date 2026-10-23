@@ -40,6 +40,7 @@ function useEnergy(n) {
 function stat(k, d = 1) { S.stats[k] = (S.stats[k] || 0) + d; }
 function log(msg, type = '') {
   S.log.unshift({ d: S.day, msg, type });
+  if (type === 'good' || type === 'bad' || type === 'warn') S.logCount = (S.logCount || 0) + 1;
   if (S.log.length > 300) S.log.length = 300;
 }
 const dayName = (d = S.day) => WD[(d - 1) % 7];

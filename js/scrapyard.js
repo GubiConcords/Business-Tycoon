@@ -65,6 +65,7 @@ function finishCar(c) {
     earn(parts, 'Scrapyard');
     c.gone = true;
     stat('scrapped');
+    addCO2('♻️ Recycling (avoided emissions)', -0.4);
     log(`🗜️ Scrapped ${c.name}: ${fmtInt(metal)} kg of metal + ${money(parts)} in parts.`);
   } else {
     c.status = 'ready';
@@ -98,7 +99,7 @@ registerModule({
     y.metalHist.push(y.metalPrice);
     if (y.metalHist.length > 90) y.metalHist.shift();
     if (!y.owned) { genOffers(); return; }
-    const wages = y.workers * YARD_WAGE * aiWageMult('yard');
+    const wages = y.workers * YARD_WAGE * aiWageMult('yard') * policy('wage');
     let paid = true;
     if (wages) {
       if (canAfford(wages)) spend(wages, 'Wages');
