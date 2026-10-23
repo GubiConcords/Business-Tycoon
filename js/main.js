@@ -2,7 +2,7 @@
 /* =====================================================================
    Main: dashboard, log & awards, random events, day loop, rendering
    ===================================================================== */
-const TAB_ORDER = ['dash', 'stocks', 'crypto', 'startups', 'resto', 'factories', 'yard', 'realestate', 'racing', 'casino', 'bank', 'taxes', 'log'];
+const TAB_ORDER = ['dash', 'job', 'stocks', 'crypto', 'startups', 'resto', 'factories', 'yard', 'realestate', 'racing', 'casino', 'bank', 'taxes', 'log'];
 const HUSTLES = [
   { id: 'odd', name: 'Odd jobs', icon: '🧹', energy: 30, pay: [90, 160] },
   { id: 'deliver', name: 'Deliver food', icon: '🛵', energy: 40, pay: [140, 230] },
@@ -42,6 +42,7 @@ const ACH = [
   ['nw10m', '🏦', 'Multi-Millionaire', 'Net worth of $10M', () => netWorth() >= 1e7],
   ['nw100m', '👑', 'Tycoon', 'Net worth of $100M', () => netWorth() >= 1e8],
   ['nw1b', '🚀', 'Billionaire', 'Net worth of $1B', () => netWorth() >= 1e9],
+  ['vp', '👔', 'Corner Office', 'Get promoted to Vice President at your 9–5', () => S.job.clicks >= 40000],
   ['honest', '😇', 'Honest Tycoon', 'Reach $1M having only ever paid taxes honestly', () => netWorth() >= 1e6 && !S.stats.dodgedTaxes],
 ];
 function checkAch() {
@@ -179,6 +180,7 @@ function showIntro() {
         <li>🏎️ <b>Racing</b>: tune cars, win prize money, bet on yourself (underground races pay more, but the police might show up)</li>
         <li>🎰 <b>Casino</b>: Plinko, slots, roulette, blackjack, crash, dice and the lottery</li>
         <li>🧾 <b>Taxes</b>: pay honestly, or cook the books and risk an audit</li>
+        <li>💼 <b>A 9–5 job</b>: click to work, starting at 1¢ per click. Get promoted up to 40¢.</li>
         <li>🏢 <b>Running costs</b>: every business needs premises (rent or buy), a permit, and pays for electricity, water, gas, internet, waste and insurance. You also pay your own living costs.</li>
       </ul>
       <p class="small muted">Each day lasts a few seconds. Use the speed controls or <b>Space</b> to pause. You have 100⚡ energy per day for hands-on work. Your game saves automatically.</p>`,
@@ -271,6 +273,7 @@ function renderTop() {
     <div class="stat"><span class="lbl">Net worth</span><span class="val">${money(nw)}</span></div>
     <div class="stat"><span class="lbl">Energy ${S.energy}/${energyMax()}⚡</span><div class="meter"><div style="width:${S.energy / energyMax() * 100}%;background:var(--energy)"></div></div></div>
     <div class="stat"><span class="lbl">Audit risk ${Math.round(risk)}%</span><div class="meter"><div style="width:${risk}%;background:var(--heat)"></div></div></div>
+    ${S.job.clockedIn ? `<span class="pill warn" data-act="tab" data-a="job" style="cursor:pointer">💼 At work: ${jobClock()}, time paused</span>` : ''}
     <div class="top-controls">${seg([[0, '⏸'], [1, '▶'], [2, '▶▶'], [3, '▶▶▶'], [4, '⚡']], S.speed, 'speed')}${btn('Next day ⏭', 'nextDay', '', { cls: 'sm' })}</div>`;
 }
 function renderNav() {
@@ -281,7 +284,7 @@ function render(force = false) {
   renderTop();
   renderNav();
   const tab = TABS.find((t) => t.id === UI.tab) || TABS[0];
-  if (!force && tab.live === false && UI.shown === tab.id) return;
+  if (!force && tab.live === false && UI.shown === tab.id) { if (tab.tick) tab.tick(); return; }
   const main = $('#main');
   UI.charts = {};
   main.innerHTML = tab.render();
@@ -297,7 +300,7 @@ document.addEventListener('click', (e) => {
   if (modalQ.length && !el.closest('#modal')) return;
   const fn = ACT[el.dataset.act];
   if (!fn) return;
-  const r = fn(el.dataset.a, el.dataset.b, el);
+  const r = fn(el.dataset.a, el.dataset.b, el, e);
   if (r !== false) render(true);
   else renderTop();
 });
@@ -330,7 +333,7 @@ function loop(now) {
   const dt = Math.min(now - last, 1000);
   last = now;
   const len = SPEEDS[S.speed];
-  if (len && !modalQ.length && !UI.gameOver) {
+  if (len && !modalQ.length && !UI.gameOver && !S.job.clockedIn) {
     acc += dt;
     if (acc >= len) { acc = 0; nextDay(); }
   }

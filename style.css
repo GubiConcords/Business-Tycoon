@@ -205,3 +205,13 @@ canvas.plinko { width: 100%; max-width: 640px; display: block; margin: 0 auto; }
 .modal-body table { width: 100%; }
 .modal-body td { white-space: normal; vertical-align: top; }
 .modal-body td.num { white-space: nowrap; padding-left: 12px; }
+
+/* ---------- 9–5 job ---------- */
+.job-desk { max-width: 720px; }
+.job-clock { font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.job-btn { position: relative; display: block; width: 100%; padding: 28px 16px; font-size: 24px; font-weight: 800; border-radius: 14px;
+  background: linear-gradient(180deg, #2b6cff, #1f4fc4); border-color: #2b6cff; color: #fff; user-select: none; -webkit-user-select: none; touch-action: manipulation; overflow: visible; }
+.job-btn:active:not(:disabled) { transform: scale(.98); }
+.job-btn:disabled { background: var(--panel-2); border-color: var(--border); color: var(--muted); font-size: 16px; }
+.job-pop { position: absolute; top: 8px; color: var(--good); font-weight: 800; font-size: 18px; pointer-events: none; animation: jobpop .7s ease-out forwards; }
+@keyframes jobpop { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, -46px); } }

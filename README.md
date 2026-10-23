@@ -6,6 +6,7 @@ A browser business simulator. You start with **$5,000** and build an empire any 
 
 | Route | What you do |
 |---|---|
+| 💼 **9–5 job** | Clock in and click **WORK**. Each click is one minute of your shift (9 AM–5 PM = 480 clicks), and the game clock pauses while you're at the office. Pay starts at **1¢ per click**, and promotions based on career clicks take you from Intern to Vice President at **40¢ per click** |
 | 📈 **Stocks** | 14 companies across 9 sectors, with daily price moves, news events, crashes, rallies and quarterly dividends |
 | 🪙 **Crypto** | 6 volatile coins, including a meme coin that can moon or get rugged |
 | 🧪 **Startups** | Angel-invest in pitches. Most fail, a few return 10–60× |
@@ -43,6 +44,7 @@ js/realestate.js  property & landlord
 js/racing.js      racing & race betting
 js/casino.js      casino games
 js/finance.js     bank, taxes & audits
+js/job.js         the 9–5 clicker job
 js/main.js        dashboard, events, achievements, day loop, rendering
 ```
 
