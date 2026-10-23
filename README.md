@@ -16,6 +16,7 @@ A browser business simulator. You start with **$5,000** and build an empire any 
 | 🤖 **AI Lab** | Open an AI Lab HQ, hire **software engineers, ML researchers and data engineers** (they produce research points), license training data, and open **data centers** (server room → hyperscale campus, rented or bought, with big power and cooling bills). Fill them with **GPU servers** or servers **built from your own chip designs**. **Train models** from Tiny to Frontier, sell an AI product to users, take AI contracts and, once capable enough, use your AI **as your own employees**: it works your 9–5 shifts and replaces restaurant, scrapyard and factory staff and even your AI researchers |
 | 🚗 **Scrapyard** | Buy junk cars at auction, crush them for metal and parts, or repair and flip them. Rare barn finds show up now and then |
 | 🏘️ **Real estate** | Buy property, set rent levels, keep tenants happy, renovate, evict, or develop new buildings from scratch |
+| 🛩️ **Garage & hangar** | Buy personal **cars** (hatchback → hypercar, classics appreciate) and **private aircraft** (ultralight → VIP airliner), or take **your own car and aircraft designs** off the production line. Cars need garage space (depends on your home, or buy a car vault), and aircraft need a **hangar** at the airport (rent or buy) plus a **pilot license** (flight school) or a hired crew. Vehicles cost insurance, fuel and maintenance, but give **prestige** (better tender odds and business lunches), **comfort** (more max energy), getaway trips that restore energy, and, with a flyable jet, cheaper and more frequent trade missions |
 | 🏎️ **Racing** | Buy and tune cars and enter races, from track days to the Grand Prix. Bet on yourself or hire a pro driver. Underground races pay more but can get raided by police |
 | 🎰 **Casino** | Plinko (3 risk levels), slots, roulette, blackjack, crash, dice and a weekly lottery |
 | 🏦 **Bank** | Loans with a credit limit tied to your net worth, plus a savings account |
@@ -48,6 +49,7 @@ js/casino.js      casino games
 js/finance.js     bank, taxes & audits
 js/ai.js          AI lab, data centers, model training, AI employees
 js/deals.js       contracts, government tenders, joint ventures, diplomacy
+js/hangar.js      personal cars, private aircraft, hangars, pilot licenses
 js/job.js         the 9–5 clicker job
 js/main.js        dashboard, events, achievements, day loop, rendering
 ```

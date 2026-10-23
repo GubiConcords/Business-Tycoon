@@ -35,7 +35,8 @@ const catRefPrice = (cat) => {
 };
 const itemName = (o) => (o.cat ? `${DCATS[o.cat].icon} ${DCATS[o.cat].name.toLowerCase()} (any of your designs)` : `${GOODS[o.item].icon} ${GOODS[o.item].name}`);
 const contractValue = (o) => (o.kind === 'ai' ? o.daily * o.days : o.qty * o.price * o.deliveries);
-const tenderChance = (o) => clamp(0.25 + rel(o.party) / 200 + S.deals.rep / 200, 0.1, 0.9);
+const tenderChance = (o) => clamp(0.25 + rel(o.party) / 200 + S.deals.rep / 200 + Math.min(0.1, prestige() / 2000), 0.1, 0.9);
+const missionCost = (c) => Math.round(50000 * c.wealth * (hasJet() ? 0.6 : 1));
 const offerLocked = (o) => rel(o.party) < o.minRel;
 function stockFor(o) {
   if (!o.cat) return S.goods[o.item].stock;
@@ -212,7 +213,7 @@ registerModule({
       const D = S.deals;
       if ((D.cooldown[sym] || 0) > S.day) return toast('You met them recently. Give it a few days.', 'warn');
       if (!pay(2500, 'Contracts', 'the business lunch')) return;
-      addRel(sym, 5); D.cooldown[sym] = S.day + 3;
+      addRel(sym, prestige() >= 30 ? 7 : 5); D.cooldown[sym] = S.day + 3;
       toast(`🍽️ Great lunch with ${STOCKS.find((s) => s.sym === sym).name}. Relations +5.`, 'good');
     },
     venture(sym, amt) {
@@ -231,10 +232,10 @@ registerModule({
       toast(`Exited the venture for ${money(v.amount * 0.9)}.`, 'good');
     },
     tradeMission(cid) {
-      const D = S.deals, c = CTRY[cid], cost = Math.round(50000 * c.wealth);
+      const D = S.deals, c = CTRY[cid], cost = missionCost(c);
       if ((D.cooldown[cid] || 0) > S.day) return toast('Your last delegation just got back. Wait a few days.', 'warn');
       if (!pay(cost, 'Contracts', 'the trade mission')) return;
-      addRel(cid, 6); D.cooldown[cid] = S.day + 5;
+      addRel(cid, 6); D.cooldown[cid] = S.day + (hasJet() ? 2 : 5);
       toast(`✈️ Trade mission to ${c.name}: relations +6.`, 'good');
     },
     openOffice(cid) {
@@ -299,7 +300,7 @@ function renderDeals() {
   } else {
     body = `<div class="banner info small">Trade agreements (relations 60+) make every commodity you buy ${pct(0.03, 0)} cheaper each, up to ${pct(MAX_TRADE_DISCOUNT, 0)} (now ${pct(tradeDiscount(), 0)}). Watch out for political crises, which can void deals overnight.</div>
       <div class="grid g2">${COUNTRIES.map((c) => {
-      const r = rel(c.id), mission = Math.round(50000 * c.wealth), office = Math.round(500000 * c.wealth), trade = Math.round(2000000 * c.wealth);
+      const r = rel(c.id), mission = missionCost(c), office = Math.round(500000 * c.wealth), trade = Math.round(2000000 * c.wealth);
       return `<div class="card tight"><div class="row between"><b>${c.flag} ${c.name}</b><span class="small muted">Wealth ${'💰'.repeat(Math.ceil(c.wealth))} · stability ${c.stability >= 0.993 ? 'high' : c.stability >= 0.988 ? 'medium' : 'low'}</span></div>
         ${barline('Relations', r, r >= 60 ? 'var(--good)' : r >= 30 ? 'var(--warn)' : 'var(--bad)')}
         <div class="row" style="margin-top:6px">${btn(`✈️ Trade mission (${money(mission)}, +6)`, 'tradeMission', c.id, { cls: 'sm', disabled: (D.cooldown[c.id] || 0) > S.day || !canAfford(mission) })}

@@ -2,7 +2,7 @@
 /* =====================================================================
    Main: dashboard, log & awards, random events, day loop, rendering
    ===================================================================== */
-const TAB_ORDER = ['dash', 'job', 'stocks', 'crypto', 'startups', 'resto', 'factories', 'deals', 'ai', 'yard', 'realestate', 'racing', 'casino', 'bank', 'taxes', 'log'];
+const TAB_ORDER = ['dash', 'job', 'stocks', 'crypto', 'startups', 'resto', 'factories', 'deals', 'ai', 'yard', 'realestate', 'fleet', 'racing', 'casino', 'bank', 'taxes', 'log'];
 const HUSTLES = [
   { id: 'odd', name: 'Odd jobs', icon: '🧹', energy: 30, pay: [90, 160] },
   { id: 'deliver', name: 'Deliver food', icon: '🛵', energy: 40, pay: [140, 230] },
@@ -48,6 +48,8 @@ const ACH = [
   ['aimodel', '🤖', 'Hello, World', 'Train your first AI model', () => S.stats.aiModels > 0],
   ['agi', '🧠', 'Singularity', 'Deploy an AI with capability 85+', () => aiCap() >= 85],
   ['automate', '🦾', 'Lights Out', 'Let your AI replace human workers', () => Object.entries(S.ai.auto).some(([k, v]) => v && (S.ai.cover[k] || 0) > 0)],
+  ['jetset', '🛩️', 'Jet Set', 'Own a private jet you can fly', () => hasJet()],
+  ['collector', '🏎️', 'Collector', 'Own 10 cars and aircraft', () => S.fleet.vehicles.length >= 10],
   ['vp', '👔', 'Corner Office', 'Get promoted to Vice President at your 9–5', () => S.job.clicks >= 40000],
   ['honest', '😇', 'Honest Tycoon', 'Reach $1M having only ever paid taxes honestly', () => netWorth() >= 1e6 && !S.stats.dodgedTaxes],
 ];
@@ -188,6 +190,7 @@ function showIntro() {
         <li>🧾 <b>Taxes</b>: pay honestly, or cook the books and risk an audit</li>
         <li>🤝 <b>Deals &amp; diplomacy</b>: supply contracts with companies, government tenders, joint ventures and trade agreements</li>
         <li>🤖 <b>AI Lab</b>: hire programmers, build data centers, train your own AI, sell it, and let it replace your employees</li>
+        <li>🛩️ <b>Garage &amp; hangar</b>: buy cars and private aircraft, or take your own designs for a spin</li>
         <li>💼 <b>A 9–5 job</b>: click to work, starting at 1¢ per click. Get promoted up to 40¢.</li>
         <li>🏢 <b>Running costs</b>: every business needs premises (rent or buy), a permit, and pays for electricity, water, gas, internet, waste and insurance. You also pay your own living costs.</li>
       </ul>

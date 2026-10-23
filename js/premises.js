@@ -26,7 +26,7 @@ const LIFESTYLES = [
   { id: 'mansion', name: 'Hilltop mansion', icon: '🏰', cost: 3500, energy: 160, desc: 'Private chef, personal trainer, butler. Peak productivity.' },
 ];
 const LIFE = Object.fromEntries(LIFESTYLES.map((l) => [l.id, l]));
-const energyMax = () => (LIFE[S.life.tier] || LIFE.studio).energy;
+const energyMax = () => (LIFE[S.life.tier] || LIFE.studio).energy + vehicleEnergyBonus();
 
 /* ---------------------------- Sites ---------------------------- */
 // a site is either rented (deposit held, daily rent) or owned (bought, appreciates with the housing market)
