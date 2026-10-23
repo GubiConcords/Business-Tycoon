@@ -202,3 +202,6 @@ canvas.plinko { width: 100%; max-width: 640px; display: block; margin: 0 auto; }
 .dz-row { display: grid; grid-template-columns: 130px 1fr; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .dz-row:last-of-type { border-bottom: 0; }
 @media (max-width: 500px) { .dz-row { grid-template-columns: 1fr; } }
+.modal-body table { width: 100%; }
+.modal-body td { white-space: normal; vertical-align: top; }
+.modal-body td.num { white-space: nowrap; padding-left: 12px; }

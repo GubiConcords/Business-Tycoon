@@ -27,17 +27,30 @@ const GOODS = {
   turbofanL: { name: 'Licensed Heavy Turbofan (75k lbf)', icon: '🌀', base: 3500000, tier: 3, part: true, spec: { thrust: 75, eff: 1, rel: 0.95 } },
 };
 const RECIPES = [
-  { out: 'cups', name: 'Cup Workshop', cost: 8000, rate: 6, opex: 80, inputs: { plastic: 1 } },
-  { out: 'plastic', name: 'Plastics Refinery', cost: 50000, rate: 50, opex: 300, inputs: { oil: 2 } },
-  { out: 'steel', name: 'Steel Mill', cost: 50000, rate: 40, opex: 350, inputs: { ore: 3 } },
-  { out: 'alu', name: 'Aluminum Smelter', cost: 55000, rate: 30, opex: 350, inputs: { bauxite: 3 } },
-  { out: 'wire', name: 'Wire Plant', cost: 45000, rate: 25, opex: 250, inputs: { copper: 2 } },
-  { out: 'wafer', name: 'Wafer Foundry', cost: 70000, rate: 40, opex: 400, inputs: { sand: 5 } },
-  { out: 'glass', name: 'Glass Works', cost: 30000, rate: 40, opex: 250, inputs: { sand: 3 } },
-  { out: 'battery', name: 'Battery Plant', cost: 90000, rate: 25, opex: 500, inputs: { copper: 1, alu: 1, plastic: 1 } },
-  { out: 'toys', name: 'Toy Factory', cost: 40000, rate: 12, opex: 300, inputs: { plastic: 3 } },
+  { out: 'cups', name: 'Cup Workshop', cost: 8000, rate: 6, opex: 60, inputs: { plastic: 1 } },
+  { out: 'plastic', name: 'Plastics Refinery', cost: 50000, rate: 50, opex: 200, inputs: { oil: 2 } },
+  { out: 'steel', name: 'Steel Mill', cost: 50000, rate: 40, opex: 240, inputs: { ore: 3 } },
+  { out: 'alu', name: 'Aluminum Smelter', cost: 55000, rate: 30, opex: 220, inputs: { bauxite: 3 } },
+  { out: 'wire', name: 'Wire Plant', cost: 45000, rate: 25, opex: 170, inputs: { copper: 2 } },
+  { out: 'wafer', name: 'Wafer Foundry', cost: 70000, rate: 40, opex: 260, inputs: { sand: 5 } },
+  { out: 'glass', name: 'Glass Works', cost: 30000, rate: 40, opex: 170, inputs: { sand: 3 } },
+  { out: 'battery', name: 'Battery Plant', cost: 90000, rate: 25, opex: 340, inputs: { copper: 1, alu: 1, plastic: 1 } },
+  { out: 'toys', name: 'Toy Factory', cost: 40000, rate: 12, opex: 200, inputs: { plastic: 3 } },
 ];
 const RCP = Object.fromEntries(RECIPES.map((r) => [r.out, r]));
+// electricity & water used per unit made (before utility price swings)
+const PLANT_UTIL = {
+  cups: [0.8, 0.1], plastic: [1.5, 0.5], steel: [3, 1], alu: [6, 0.5], wire: [2, 0.2],
+  wafer: [2.5, 2], glass: [2, 0.3], battery: [3, 0.5], toys: [1.5, 0.2],
+};
+// product lines: share of each unit's value spent on power & water, and the permit needed to open
+const LINE_UTIL = { chip: 0.03, carEngine: 0.008, jetEngine: 0.004, car: 0.006, phone: 0.008, aircraft: 0.003 };
+const LINE_PERMIT = {
+  chip: ['Cleanroom & hazardous materials permit', 50000], carEngine: ['Industrial emissions permit', 40000],
+  jetEngine: ['FAA production certificate (engines)', 2000000], car: ['Vehicle manufacturer license', 300000],
+  phone: ['Electronics manufacturing permit', 30000], aircraft: ['FAA production certificate (aircraft)', 5000000],
+};
+const facSiteRent = (cost) => cost * 0.0015;
 const SPREAD = 0.05;
 const MARKET_EVENTS = [
   { goods: ['oil', 'plastic'], d: 0.3, text: '🛢️ Oil supply shock! Crude and plastic prices spike.' },
@@ -298,10 +311,29 @@ function facOpex(f) {
   return DCATS[f.cat].opex * (d ? d.opexMult : 0.3) * lvl * cut;
 }
 const facUpgradeCost = (f) => facDef(f).cost * 0.6 * f.level;
-function facValue(f) {
+function facEquipment(f) {
   let v = facDef(f).cost;
   for (let l = 1; l < f.level; l++) v += facDef(f).cost * 0.6 * l;
-  return v * 0.5;
+  return v;
+}
+const facValue = (f) => facEquipment(f) * 0.5 + siteValue(f.site);
+// load: 1 = running, lower when paused/idle; made: units produced today
+function facBills(f, load, made) {
+  const o = facOpex(f) / (f.safety === 'cut' ? 0.7 : 1);
+  const use = { elec: 0, water: 0 };
+  if (made) {
+    if (f.kind === 'line') {
+      const d = facDesign(f), v = made * d.price * LINE_UTIL[f.cat];
+      use.elec = v * 0.75; use.water = v * 0.25;
+    } else {
+      use.elec = made * PLANT_UTIL[f.good][0]; use.water = made * PLANT_UTIL[f.good][1];
+    }
+  }
+  return makeBills(f.site, { elec: o * 0.04 * load, water: o * 0.01 * load, net: 5 + o * 0.005, waste: o * 0.02 * load }, use, f.insured, facEquipment(f));
+}
+function chargeFacBills(f, load, made) {
+  f.bills = facBills(f, load, made);
+  payBills(f.bills);
 }
 const facBom = (f) => (f.kind === 'line' ? (facDesign(f) || { bom: {} }).bom : RCP[f.good].inputs);
 const facOut = (f) => (f.kind === 'line' ? 'd:' + f.designId : f.good);
@@ -360,6 +392,8 @@ registerModule({
     const OLD = { chip: 120000, board: 180000, cpu: 250000, phone: 450000, car: 1800000, engine: 900000, avionics: 750000, airliner: 4000000 };
     s.factories = s.factories.filter((f) => {
       if (!f.kind) f.kind = 'fixed';
+      if (!f.site) f.site = { own: false, rent: facSiteRent(facDef(f) ? facDef(f).cost : 0), price: facSiteRent(facDef(f) ? facDef(f).cost : 0) * 600, deposit: 0 };
+      if (f.insured === undefined) f.insured = true;
       if (f.kind === 'line' || RCP[f.good]) return true;
       const refund = (OLD[f.good] || 100000) * (1 + 0.6 * (f.level - 1));
       s.cash += refund;
@@ -418,16 +452,17 @@ registerModule({
     for (const f of sorted) {
       const def = facDef(f);
       f.last = { made: 0, note: '' };
-      if (f.paused) { spend(facOpex(f) * 0.15, 'Factories'); f.last.note = 'Paused (maintenance only)'; continue; }
-      if (f.closed > 0) { f.closed--; f.last.note = 'Shut down after accident'; continue; }
-      if (f.retool > 0) { f.retool--; spend(facOpex(f) * 0.3, 'Factories'); f.last.note = `Retooling (${f.retool} more day${f.retool === 1 ? '' : 's'})`; continue; }
+      if (f.paused) { spend(facOpex(f) * 0.15, 'Factories'); chargeFacBills(f, 0.2, 0); f.last.note = 'Paused (maintenance, rent and standby utilities only)'; continue; }
+      if (f.closed > 0) { f.closed--; chargeFacBills(f, 0.3, 0); f.last.note = 'Shut down after accident'; continue; }
+      if (f.retool > 0) { f.retool--; spend(facOpex(f) * 0.3, 'Factories'); chargeFacBills(f, 0.5, 0); f.last.note = `Retooling (${f.retool} more day${f.retool === 1 ? '' : 's'})`; continue; }
       const d = facDesign(f);
-      if (f.kind === 'line' && (!d || d.status !== 'approved')) { spend(facOpex(f) * 0.15, 'Factories'); f.last.note = 'Idle: assign an approved design'; continue; }
-      if (d && f.cat === 'chip' && f.level < d.minLevel) { spend(facOpex(f) * 0.15, 'Factories'); f.last.note = `Idle: ${esc(d.name)} needs fab level ${d.minLevel}`; continue; }
+      if (f.kind === 'line' && (!d || d.status !== 'approved')) { spend(facOpex(f) * 0.15, 'Factories'); chargeFacBills(f, 0.2, 0); f.last.note = 'Idle: assign an approved design'; continue; }
+      if (d && f.cat === 'chip' && f.level < d.minLevel) { spend(facOpex(f) * 0.15, 'Factories'); chargeFacBills(f, 0.2, 0); f.last.note = `Idle: ${esc(d.name)} needs fab level ${d.minLevel}`; continue; }
       const opex = facOpex(f);
-      if (!canAfford(opex)) { f.last.note = 'Could not pay workers. Production halted!'; log(`⚠️ ${def.name}: couldn't pay ${money(opex)} in operating costs.`, 'bad'); continue; }
+      if (!canAfford(opex)) { chargeFacBills(f, 0.3, 0); f.last.note = 'Could not pay workers. Production halted!'; log(`⚠️ ${def.name}: couldn't pay ${money(opex)} in operating costs.`, 'bad'); continue; }
       spend(opex, 'Factories');
       const made = produce(f);
+      chargeFacBills(f, 1, made);
       f.last.made = made;
       if (d) { d.made += made; stat('made_' + d.cat, made); }
       if (made && f.cat === 'aircraft') { log(`✈️ Your hangar rolled out ${made} ${esc(d.name)} aircraft!`, 'good'); toast(`✈️ New ${esc(d.name)} rolled out!`, 'good'); }
@@ -435,12 +470,13 @@ registerModule({
       if (f.safety === 'cut') {
         addRisk(0.25);
         if (chance(0.007)) {
-          const fine = Math.round(def.cost * 0.06);
+          const fine = Math.round(def.cost * 0.06), repair = Math.round(def.cost * 0.1 * (f.insured ? 0.1 : 1));
           spend(fine, 'Fines');
+          spend(repair, 'Factories');
           f.closed = 3;
           addRisk(10);
-          log(`🔥 Workplace accident at your ${def.name}! Regulators fined you ${money(fine)} and closed it for 3 days.`, 'bad');
-          showModal({ title: '🔥 Factory accident', cls: 'danger', body: `<p>Cutting corners on safety caught up with you at the <b>${def.name}</b>.</p><p>Fine: <b>${money(fine)}</b>. The plant is closed for 3 days.</p>` });
+          log(`🔥 Workplace accident at your ${def.name}! Regulators fined you ${money(fine)}, repairs cost ${money(repair)}, and it's closed for 3 days.`, 'bad');
+          showModal({ title: '🔥 Factory accident', cls: 'danger', body: `<p>Cutting corners on safety caught up with you at the <b>${def.name}</b>.</p><p>Fine: <b>${money(fine)}</b>. Repairs: <b>${money(repair)}</b> ${f.insured ? '(after insurance)' : '(uninsured!)'}. The plant is closed for 3 days.</p>` });
         }
       }
     }
@@ -460,18 +496,28 @@ registerModule({
     facView(a) { UI.facView = a; },
     buildFactory(a) {
       const r = RCP[a];
-      if (!pay(r.cost, 'Investments', r.name)) return;
-      S.factories.push({ id: uid(), kind: 'fixed', good: a, level: 1, progress: 0, autoBuy: true, autoSell: true, paused: false, safety: 'full', closed: 0, retool: 0, last: null });
-      log(`🏭 You built a ${r.name} for ${money(r.cost)}.`, 'good');
-      stat('factoriesBuilt');
+      openBusiness({
+        title: r.name, icon: GOODS[a].icon, equipment: r.cost, permit: { name: 'Industrial zoning permit', cost: Math.max(1000, r.cost * 0.05) },
+        rent: facSiteRent(r.cost), price: facSiteRent(r.cost) * 600,
+        done(site) {
+          S.factories.push({ id: uid(), kind: 'fixed', good: a, level: 1, progress: 0, autoBuy: true, autoSell: true, paused: false, safety: 'full', closed: 0, retool: 0, last: null, site, insured: true, bills: null });
+          log(`🏭 You opened a ${r.name} on ${site.own ? 'land you bought' : 'a rented industrial lot'}.`, 'good');
+          stat('factoriesBuilt');
+        },
+      });
     },
     buildLine(cat) {
-      const c = DCATS[cat];
-      if (!pay(c.facCost, 'Investments', c.factory)) return;
-      S.factories.push({ id: uid(), kind: 'line', cat, designId: null, level: 1, progress: 0, autoBuy: true, autoSell: true, paused: false, safety: 'full', closed: 0, retool: 0, last: null });
-      log(`🏭 You built a ${c.factory} for ${money(c.facCost)}.`, 'good');
-      stat('factoriesBuilt');
-      UI.facView = 'plants';
+      const c = DCATS[cat], pm = LINE_PERMIT[cat];
+      openBusiness({
+        title: c.factory, icon: c.icon, equipment: c.facCost, permit: { name: pm[0], cost: pm[1] },
+        rent: facSiteRent(c.facCost), price: facSiteRent(c.facCost) * 600,
+        done(site) {
+          S.factories.push({ id: uid(), kind: 'line', cat, designId: null, level: 1, progress: 0, autoBuy: true, autoSell: true, paused: false, safety: 'full', closed: 0, retool: 0, last: null, site, insured: true, bills: null });
+          log(`🏭 You opened a ${c.factory} on ${site.own ? 'land you bought' : 'a rented industrial site'}.`, 'good');
+          stat('factoriesBuilt');
+          UI.facView = 'plants';
+        },
+      });
     },
     assignDesign(a, did) {
       const f = facById(a), d = dById(did);
@@ -492,10 +538,12 @@ registerModule({
       f.level++;
       toast(`${facDef(f).name} upgraded to level ${f.level}.`, 'good');
     },
+    facBuySite(a) { buySite(facById(a).site); },
+    facInsure(a) { const f = facById(a); f.insured = !f.insured; },
     facSell(a) {
       const f = facById(a), v = facValue(f), name = facDef(f).name;
       showModal({
-        title: `Sell ${name}?`, body: `<p>You'll get <b>${money(v)}</b> for the plant and equipment.</p>`,
+        title: `Sell ${name}?`, body: `<p>You'll get <b>${money(v)}</b> for the equipment${f.site.own ? ' and the land' : ' plus your rent deposit back'}.</p>`,
         buttons: [{ label: `Sell for ${money(v)}`, cls: 'danger', fn: () => { earn(v, 'Investments'); S.factories.splice(S.factories.indexOf(f), 1); log(`💼 Sold your ${name} for ${money(v)}.`); } }, { label: 'Cancel' }],
       });
     },
@@ -595,6 +643,7 @@ function renderPlants() {
         <div class="small muted">Level ${f.level} · ${rateText(facRate(f))} · ${money(facOpex(f))}/day</div></div></div>${pill}</div>
       ${product}
       ${L ? `<div class="small ${L.note ? 'warn' : 'muted'}">Yesterday: made ${L.made}${L.note ? ' · ' + L.note : ''}</div>` : ''}
+      <div class="small" style="margin-top:6px">${siteLabel(f.site)}</div>${billsHtml(f.bills)}
       <div class="row" style="margin-top:10px">
         ${btn(`Auto-buy inputs: ${f.autoBuy ? 'ON' : 'OFF'}`, 'facToggle', f.id, { b: 'autoBuy', cls: 'sm ' + (f.autoBuy ? 'on' : '') })}
         ${btn(`Auto-sell: ${f.autoSell ? 'ON' : 'OFF'}`, 'facToggle', f.id, { b: 'autoSell', cls: 'sm ' + (f.autoSell ? 'on' : '') })}
@@ -603,6 +652,8 @@ function renderPlants() {
       </div>
       <div class="row" style="margin-top:8px">
         ${f.level < 5 ? btn(`⬆ Upgrade (${money(facUpgradeCost(f))})`, 'facUpgrade', f.id, { cls: 'sm', disabled: !canAfford(facUpgradeCost(f)) }) : '<span class="pill">Max level</span>'}
+        ${f.site.own ? '' : btn(`🔑 Buy the land (${money(sitePrice(f.site))})`, 'facBuySite', f.id, { cls: 'sm', disabled: !canAfford(sitePrice(f.site)) })}
+        ${btn(f.insured ? '🛡️ Insured' : '⚠️ Uninsured', 'facInsure', f.id, { cls: 'sm ' + (f.insured ? 'on' : ''), title: 'Insurance covers most repair costs after accidents' })}
         ${btn('Sell', 'facSell', f.id, { cls: 'sm' })}</div></div>`;
   }).join('')}</div>`;
 }
@@ -614,14 +665,14 @@ function renderBuild() {
     return `<div class="card tight"><div class="row"><span class="big-ico">${GOODS[r.out].icon}</span><div class="grow"><b>${r.name}</b>
       <div class="small muted">Makes ${GOODS[r.out].name} · ${rateText(r.rate)}</div></div></div>
       <div class="small" style="margin:6px 0">${recipeLine(r.inputs, GOODS[r.out].icon)}</div>
-      <div class="small muted">Operating cost ${money(r.opex)}/day</div>
-      <div class="small">Est. profit buying inputs at today's prices: <b class="${cls(m)}">${signMoney(m)}/day</b></div>
-      <div style="margin-top:8px">${btn(`Build ${money(r.cost)}`, 'buildFactory', r.out, { cls: 'buy sm', disabled: !canAfford(r.cost) })}</div></div>`;
+      <div class="small muted">Workers ${money(r.opex)}/day · power ${PLANT_UTIL[r.out][0]} & water ${PLANT_UTIL[r.out][1]} per unit · lot rent ${money(rentNow(facSiteRent(r.cost)))}/day</div>
+      <div class="small">Est. profit before utilities &amp; rent: <b class="${cls(m)}">${signMoney(m)}/day</b></div>
+      <div style="margin-top:8px">${btn(`Open from ${money(r.cost + Math.max(1000, r.cost * 0.05) + facSiteRent(r.cost) * DEPOSIT_DAYS)}`, 'buildFactory', r.out, { cls: 'buy sm', disabled: !canAfford(r.cost + Math.max(1000, r.cost * 0.05) + facSiteRent(r.cost) * DEPOSIT_DAYS) })}</div></div>`;
   }).join('')}</div>`).join('');
   const lines = Object.entries(DCATS).map(([k, c]) => `<div class="card tight"><div class="row"><span class="big-ico">${c.icon}</span><div class="grow"><b>${c.factory}</b>
     <div class="small muted">Builds your own ${c.name.toLowerCase()} designs${c.cert ? ` · products need ${c.cert}` : ''}</div></div></div>
-    <div class="small muted" style="margin:6px 0">Base operating cost ${money(c.opex)}/day${k === 'chip' ? ' · upgrade the fab to unlock smaller process nodes' : ''}</div>
-    ${btn(`Build ${money(c.facCost)}`, 'buildLine', k, { cls: 'buy sm', disabled: !canAfford(c.facCost) })}</div>`).join('');
+    <div class="small muted" style="margin:6px 0">Equipment ${money(c.facCost)} · 📄 ${LINE_PERMIT[k][0]} ${money(LINE_PERMIT[k][1])} · site rent ${money(rentNow(facSiteRent(c.facCost)))}/day · base operating cost ${money(c.opex)}/day${k === 'chip' ? ' · upgrade the fab to unlock smaller process nodes' : ''}</div>
+    ${btn(`Open from ${money(c.facCost + LINE_PERMIT[k][1] + facSiteRent(c.facCost) * DEPOSIT_DAYS)}`, 'buildLine', k, { cls: 'buy sm', disabled: !canAfford(c.facCost + LINE_PERMIT[k][1] + facSiteRent(c.facCost) * DEPOSIT_DAYS) })}</div>`).join('');
   return `<h4>Product lines (for your own designs)</h4><div class="grid g3 section">${lines}</div>${fixed}`;
 }
 
@@ -651,8 +702,8 @@ function renderStudio() {
       <div class="banner warn small" style="margin-top:10px">
         🧪 R&amp;D: <b>${money(r.rnd)}</b> · ${r.days} days<br>
         ${r.cert ? `📋 ${c.cert}: <b>${money(r.cert.cost)}</b> · ${r.cert.days} days · ${pct(r.cert.pass, 0)} pass chance<br>` : '📋 No certification needed<br>'}
-        🏭 Needs a <b>${c.factory}</b> (${money(c.facCost)})${r.minLevel > 1 ? ` at level ${r.minLevel}+` : ''}<br>
-        Total before the first unit ships: <b>${money(costTotal + (S.factories.some((f) => f.cat === cat) ? 0 : c.facCost))}</b>
+        🏭 Needs a <b>${c.factory}</b> (${money(c.facCost)} equipment + ${LINE_PERMIT[cat][0]} ${money(LINE_PERMIT[cat][1])} + site)${r.minLevel > 1 ? ` at level ${r.minLevel}+` : ''}<br>
+        Total before the first unit ships: <b>${money(costTotal + (S.factories.some((f) => f.cat === cat) ? 0 : c.facCost + LINE_PERMIT[cat][1] + facSiteRent(c.facCost) * DEPOSIT_DAYS))}</b>
       </div>
       <div style="margin-top:10px">${btn(`🧪 Start R&D (${money(r.rnd)})`, 'startDesign', '', { cls: 'primary', disabled: !!r.error || !canAfford(r.rnd) })}</div>
     </div>

@@ -16,6 +16,7 @@ A browser business simulator. You start with **$5,000** and build an empire any 
 | 🏎️ **Racing** | Buy and tune cars and enter races, from track days to the Grand Prix. Bet on yourself or hire a pro driver. Underground races pay more but can get raided by police |
 | 🎰 **Casino** | Plinko (3 risk levels), slots, roulette, blackjack, crash, dice and a weekly lottery |
 | 🏦 **Bank** | Loans with a credit limit tied to your net worth, plus a savings account |
+| 🏢 **Running costs** | Opening any business costs **equipment + a permit/license** (from a $400 food vendor license to a $5M FAA production certificate) **+ premises**: rent them (30-day deposit plus daily rent) or buy them outright (no rent, small property tax, value follows the housing market). You can buy rented premises later. Every day you pay **electricity, water, gas, internet & phone, waste disposal and insurance**, scaled to how busy the business is. Utility prices swing with heatwaves, droughts and pipeline outages. Insurance covers most of the cost of fires and accidents. Race cars cost garage space and insurance, landlords pay property tax and utilities on vacant units, and you pay your own **living costs** (parents' basement → mansion), which set your daily energy |
 | 🧾 **Taxes & risk** | Business profits are taxed weekly. Pay honestly, use creative accounting, or set up an offshore shell company. Each step down that path raises your audit risk, and audits are expensive |
 
 Also included: energy-based hustles, random events (health inspectors, critics, viral posts, fires, lawsuits, inheritances), 29 achievements, a net worth chart, an event log and autosave to `localStorage`.
@@ -33,6 +34,7 @@ index.html        page shell
 style.css         styles (dark theme, responsive)
 js/util.js        helpers, modals, toasts, charts, module registry
 js/state.js       game state, money helpers, save/load
+js/premises.js    premises (rent/buy), permits, utility bills, living costs
 js/markets.js     stocks, crypto, startups
 js/restaurants.js restaurants
 js/factories.js   commodity plants, design studio, R&D, certification, product lines

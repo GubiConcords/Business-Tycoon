@@ -68,7 +68,7 @@ const EVENTS = [
   { w: 3, ok: () => S.restaurants.some((r) => !r.closed), run() {
     const r = pick(S.restaurants.filter((x) => !x.closed)), t = RT[r.type];
     if (r.clean < 50) {
-      const fine = 1000 + t.rent * 5;
+      const fine = 1000 + REST_SITE[r.type].size * 800;
       spend(fine, 'Fines'); r.rep = clamp(r.rep - 10, 0, 100); r.closed = 1;
       log(`🧑‍⚕️ Health inspector found ${esc(r.name)} filthy! Fined ${money(fine)} and closed for a day.`, 'bad');
       toast(`Health inspection failed at ${esc(r.name)}!`, 'bad');
@@ -87,10 +87,11 @@ const EVENTS = [
     toast(`${esc(r.name)} went viral!`, 'good');
   } },
   { w: 0.4, ok: () => S.restaurants.some((r) => !r.closed), run() {
-    const r = pick(S.restaurants.filter((x) => !x.closed)), cost = Math.round(RT[r.type].cost * 0.06);
+    const r = pick(S.restaurants.filter((x) => !x.closed)), full = Math.round(RT[r.type].cost * 0.3), cost = Math.round(full * (r.insured ? 0.1 : 1));
     spend(cost, 'Restaurants'); r.closed = 4;
-    log(`🔥 Kitchen fire at ${esc(r.name)}! Repairs cost ${money(cost)} and it's closed for 4 days.`, 'bad');
-    showModal({ title: '🔥 Kitchen fire!', cls: 'danger', body: `<p>A grease fire broke out at <b>${esc(r.name)}</b>. No one was hurt, but repairs cost <b>${money(cost)}</b> and it will be closed for 4 days.</p>` });
+    log(`🔥 Kitchen fire at ${esc(r.name)}! Repairs cost ${money(cost)}${r.insured ? ' after insurance' : ' (uninsured!)'} and it's closed for 4 days.`, 'bad');
+    showModal({ title: '🔥 Kitchen fire!', cls: 'danger', body: `<p>A grease fire broke out at <b>${esc(r.name)}</b>. No one was hurt, but the damage is <b>${money(full)}</b>.</p>
+      <p>${r.insured ? `🛡️ Insurance covers most of it. You pay the <b>${money(cost)}</b> deductible.` : `⚠️ You had no insurance. You pay the full <b>${money(cost)}</b>.`} It will be closed for 4 days.</p>` });
   } },
   { w: 0.8, ok: () => netWorth() > 500000, run() {
     const claim = Math.round(netWorth() * 0.02), lose = Math.round(netWorth() * 0.05);
@@ -137,7 +138,7 @@ function nextDay() {
   S.lastLedger = S.ledger;
   S.ledger = {};
   S.day++;
-  S.energy = 100;
+  S.energy = energyMax();
 
   const nw = netWorth();
   S.history.push(nw);
@@ -178,6 +179,7 @@ function showIntro() {
         <li>🏎️ <b>Racing</b>: tune cars, win prize money, bet on yourself (underground races pay more, but the police might show up)</li>
         <li>🎰 <b>Casino</b>: Plinko, slots, roulette, blackjack, crash, dice and the lottery</li>
         <li>🧾 <b>Taxes</b>: pay honestly, or cook the books and risk an audit</li>
+        <li>🏢 <b>Running costs</b>: every business needs premises (rent or buy), a permit, and pays for electricity, water, gas, internet, waste and insurance. You also pay your own living costs.</li>
       </ul>
       <p class="small muted">Each day lasts a few seconds. Use the speed controls or <b>Space</b> to pause. You have 100⚡ energy per day for hands-on work. Your game saves automatically.</p>`,
     buttons: [{ label: "Let's make money! 💸", cls: 'primary', fn: () => { S.seenIntro = true; save(); } }],
@@ -204,14 +206,25 @@ function renderDash() {
   <div class="grid g2 section">
     <div class="card"><h3>💪 Hustle (uses energy)</h3><p class="small muted">Short on cash? Earn a little with your own two hands.</p>
       <div class="grid" style="gap:8px">${hustles}</div>
-      <div style="margin-top:10px">${barline('Energy ⚡', S.energy, 'var(--energy)')}</div></div>
+      <div style="margin-top:10px">${barline(`Energy ${S.energy}/${energyMax()}⚡`, S.energy / energyMax() * 100, 'var(--energy)')}</div></div>
     <div class="card"><h3>Yesterday's cash flow</h3>${led.length ? `<table><tbody>${led.map(([k, v]) => `<tr><td>${k}</td><td class="num ${cls(v)}">${signMoney(v)}</td></tr>`).join('')}
       <tr><td><b>Total</b></td><td class="num ${cls(net)}"><b>${signMoney(net)}</b></td></tr></tbody></table>` : '<p class="muted">Nothing yet. Wait for the day to end.</p>'}</div>
   </div>
+  <div class="grid g2 section">${renderLiving()}</div>
   <div class="grid g2">
     <div class="card"><h3>Assets</h3>${alloc.map(([k, v]) => `<div class="barline" style="grid-template-columns:100px 1fr 90px"><span class="muted">${ASSET_LABELS[k] || k}</span>${bar(Math.max(0, v) / gross * 100, v < 0 ? 'var(--bad)' : 'var(--accent)')}<span class="num right ${v < 0 ? 'bad' : ''}">${money(v)}</span></div>`).join('')}</div>
     <div class="card"><h3>Latest news</h3><div class="log" style="max-height:280px">${S.log.slice(0, 14).map(logLine).join('') || '<p class="muted">Quiet so far…</p>'}</div></div>
   </div>`;
+}
+function renderLiving() {
+  const cur = LIFE[S.life.tier], L = S.lastLedger;
+  const fixed = ['Rent', 'Utilities', 'Insurance', 'Wages', 'Living costs'].map((k) => [k, -(L[k] || 0)]).filter(([, v]) => v > 0.5);
+  const rate = (k, label) => `<div class="barline" style="grid-template-columns:110px 1fr 60px"><span class="muted">${label}</span>${bar(S.utilRates[k] / 2.2 * 100, S.utilRates[k] > 1.15 ? 'var(--bad)' : S.utilRates[k] < 0.9 ? 'var(--good)' : 'var(--warn)')}<span class="num right">${pct(S.utilRates[k], 0)}</span></div>`;
+  return `<div class="card"><h3>🏠 Where you live</h3><p class="small muted">${cur.icon} <b>${cur.name}</b>: ${money(cur.cost)}/day · ${cur.energy}⚡ max energy. ${cur.desc}</p>
+    <div class="grid" style="gap:6px">${LIFESTYLES.map((l) => btn(`${l.icon} ${l.name} <span class="muted">${money(l.cost)}/day · ${l.energy}⚡</span>`, 'lifestyle', l.id, { cls: l.id === S.life.tier ? 'on' : '', disabled: l.id === S.life.tier })).join('')}</div></div>
+  <div class="card"><h3>🧾 Running costs</h3>
+    ${fixed.length ? `<table><tbody>${fixed.map(([k, v]) => `<tr><td>${k}</td><td class="num bad">${money(v)}</td></tr>`).join('')}<tr><td><b>Yesterday's fixed costs</b></td><td class="num bad"><b>${money(fixed.reduce((s, [, v]) => s + v, 0))}</b></td></tr></tbody></table>` : '<p class="muted small">No bills yet.</p>'}
+    <h4 style="margin-top:12px">Utility prices (100% = normal)</h4>${rate('elec', '⚡ Electricity')}${rate('water', '💧 Water')}${rate('gas', '🔥 Gas')}</div>`;
 }
 const logLine = (l) => `<div class="log-line ${l.type}"><span class="d">Day ${l.d}</span>${l.msg}</div>`;
 
@@ -256,7 +269,7 @@ function renderTop() {
     <div class="stat"><span class="lbl">Day ${S.day}</span><span class="val">${dayName()}</span></div>
     <div class="stat"><span class="lbl">Cash</span><span class="val good">${money(S.cash)}</span></div>
     <div class="stat"><span class="lbl">Net worth</span><span class="val">${money(nw)}</span></div>
-    <div class="stat"><span class="lbl">Energy ${S.energy}⚡</span><div class="meter"><div style="width:${S.energy}%;background:var(--energy)"></div></div></div>
+    <div class="stat"><span class="lbl">Energy ${S.energy}/${energyMax()}⚡</span><div class="meter"><div style="width:${S.energy / energyMax() * 100}%;background:var(--energy)"></div></div></div>
     <div class="stat"><span class="lbl">Audit risk ${Math.round(risk)}%</span><div class="meter"><div style="width:${risk}%;background:var(--heat)"></div></div></div>
     <div class="top-controls">${seg([[0, '⏸'], [1, '▶'], [2, '▶▶'], [3, '▶▶▶'], [4, '⚡']], S.speed, 'speed')}${btn('Next day ⏭', 'nextDay', '', { cls: 'sm' })}</div>`;
 }

@@ -27,6 +27,7 @@ const PRO_SKILL = 75;
 const carPerf = (c) => RCAR[c.model].perf + c.tune * 3;
 const tuneCost = (c) => Math.round(RCAR[c.model].price * 0.15 * (c.tune + 1));
 const carRepairCost = (c) => Math.round(RCAR[c.model].price * 0.004 * (100 - c.cond));
+const raceCarUpkeep = (c) => 25 + RCAR[c.model].price * 0.0006;  // garage space, insurance, registration
 const carValue = (c) => (RCAR[c.model].price + c.tune * RCAR[c.model].price * 0.1) * 0.7 * (0.5 + c.cond / 200);
 const raceCar = () => S.race.cars.find((c) => c.id === UI.raceCar) || S.race.cars.find((c) => !c.impound);
 const proFee = (ev) => Math.round(1000 + RTYPE[ev.type].entry * 0.4);
@@ -114,7 +115,10 @@ registerModule({
   start() { genRaces(); },
   assets(a) { a.racing = S.race.cars.reduce((t, c) => t + carValue(c), 0); },
   daily() {
-    for (const c of S.race.cars) if (c.impound > 0 && !--c.impound) log(`🚗 Your ${RCAR[c.model].name} was released from the impound lot.`);
+    for (const c of S.race.cars) {
+      spend(raceCarUpkeep(c), 'Racing');
+      if (c.impound > 0 && !--c.impound) log(`🚗 Your ${RCAR[c.model].name} was released from the impound lot.`);
+    }
     genRaces();
   },
   tabs: [{ id: 'racing', name: 'Racing', icon: '🏎️', render: renderRacing }],
@@ -159,7 +163,7 @@ function renderRacing() {
   const garage = R.cars.map((c) => {
     const m = RCAR[c.model];
     return `<div class="list-item ${car === c ? 'sel' : ''}"><span class="big-ico">${m.icon}</span><div class="grow"><b>${m.name}</b> ${car === c ? '<span class="pill good">Selected</span>' : ''} ${c.impound ? `<span class="pill bad">Impounded ${c.impound}d</span>` : ''}
-      <div class="small muted">Performance <b>${carPerf(c)}</b> · tune ${c.tune}/5</div>${barline('Condition', c.cond, c.cond < 40 ? 'var(--bad)' : 'var(--good)')}</div>
+      <div class="small muted">Performance <b>${carPerf(c)}</b> · tune ${c.tune}/5 · garage, insurance &amp; registration ${money(raceCarUpkeep(c))}/day</div>${barline('Condition', c.cond, c.cond < 40 ? 'var(--bad)' : 'var(--good)')}</div>
       <div class="row">${car !== c ? btn('Select', 'selRaceCar', c.id, { cls: 'sm' }) : ''}
       ${c.tune < 5 ? btn(`Tune +3 (${money(tuneCost(c))})`, 'tuneCar', c.id, { cls: 'sm', disabled: !canAfford(tuneCost(c)) }) : ''}
       ${c.cond < 100 ? btn(`Repair (${money(carRepairCost(c))})`, 'repairRaceCar', c.id, { cls: 'sm', disabled: !canAfford(carRepairCost(c)) }) : ''}

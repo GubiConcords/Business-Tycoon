@@ -65,7 +65,8 @@ registerModule({
     for (const p of re.props) {
       const t = PT[p.type], lvl = RENT_LVL[p.rentLvl];
       p.cond = clamp(p.cond - 0.12, 0, 100);
-      spend(t.rent * 0.12, 'Real Estate');
+      // landlord costs: upkeep, property tax, and utilities while nobody is living there
+      spend(t.rent * 0.12 + propValue(p) * PROPERTY_TAX + (p.tenant ? 0 : t.rent * 0.08 * (S.utilRates.elec + S.utilRates.water) / 2), 'Real Estate');
       if (p.ad > 0) p.ad--;
       if (p.tenant) {
         const tn = p.tenant;
@@ -173,7 +174,7 @@ function renderRealEstate() {
       return `<div class="card"><div class="row between"><div class="row"><span class="big-ico">${t.icon}</span><div><b>${t.name}</b><div class="small muted">${p.addr} · worth ${money(propValue(p))}</div></div></div>
         ${tn ? (tn.late ? `<span class="pill warn">Rent late ${tn.late}d</span>` : '<span class="pill good">Occupied</span>') : `<span class="pill bad">Vacant ${p.vacant}d</span>`}</div>
         <div style="margin-top:8px">${barline('Condition', p.cond, p.cond < 40 ? 'var(--bad)' : '#36c2b4')}${tn ? barline('Tenant mood', tn.happy, tn.happy < 30 ? 'var(--bad)' : 'var(--good)') : ''}</div>
-        <div class="small">Rent: <b>${money(propRent(p))}/day</b> · upkeep ${money(t.rent * 0.12)}/day${p.ad ? ` · 📣 advertised ${p.ad}d` : ''}</div>
+        <div class="small">Rent: <b>${money(propRent(p))}/day</b> · upkeep ${money(t.rent * 0.12)} + property tax ${money(propValue(p) * PROPERTY_TAX)}${tn ? '' : ` + vacant utilities ${money(t.rent * 0.08)}`}/day${p.ad ? ` · 📣 advertised ${p.ad}d` : ''}</div>
         <div class="row" style="margin-top:8px"><span class="small muted">Rent level</span>
           <div class="seg">${Object.entries(RENT_LVL).map(([k, l]) => btn(l.name, 'propRent', p.id, { b: k, cls: 'sm ' + (p.rentLvl === k ? 'on' : '') })).join('')}</div></div>
         <div class="row" style="margin-top:8px">

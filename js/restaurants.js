@@ -3,7 +3,7 @@
    Restaurants: open venues, hire & pay staff, set prices and quality
    ===================================================================== */
 const REST_TYPES = [
-  { id: 'truck', name: 'Food Truck', icon: '🚚', cost: 4000, rent: 35, seats: 80, basePrice: 9, ingr: 3.2, demand: 70, maxStaff: 3, noWaiters: true },
+  { id: 'truck', name: 'Food Truck', icon: '🚚', cost: 3000, rent: 30, seats: 80, basePrice: 9, ingr: 3.2, demand: 70, maxStaff: 3, noWaiters: true },
   { id: 'cafe', name: 'Coffee Shop', icon: '☕', cost: 15000, rent: 90, seats: 180, basePrice: 6, ingr: 1.6, demand: 160, maxStaff: 7, cookMult: 1.6 },
   { id: 'diner', name: 'Diner', icon: '🍔', cost: 40000, rent: 200, seats: 220, basePrice: 16, ingr: 5.5, demand: 180, maxStaff: 11 },
   { id: 'sushi', name: 'Sushi Bar', icon: '🍣', cost: 120000, rent: 520, seats: 260, basePrice: 38, ingr: 13, demand: 190, maxStaff: 14, wageMult: 1.3 },
@@ -24,9 +24,26 @@ const QUALITY = {
 };
 const REST_NAMES = ['Golden Fork', 'Blue Plate', 'The Rusty Spoon', "Mama Rosa's", 'Smoke & Salt', 'Urban Bites', 'Saffron House', 'Lucky Dragon', 'Harbor Grill', 'Velvet Table', 'The Hungry Moose', 'Copper Pot', 'Night Owl', 'Sunny Side', 'Ember & Oak'];
 const SHIFT_ENERGY = 40;
+// premises size (drives base utilities) and the permit you need to open
+const REST_SITE = {
+  truck: { size: 1, site: 'a parking & commissary spot', permit: ['Mobile food vendor license', 400] },
+  cafe: { size: 2, site: 'a corner shop', permit: ['Food service permit', 1200] },
+  diner: { size: 4, site: 'a roadside diner building', permit: ['Food service & health permit', 2500] },
+  sushi: { size: 5, site: 'a downtown storefront', permit: ['Raw food & health permit', 5000] },
+  fine: { size: 8, site: 'an upscale venue', permit: ['Liquor license & health permit', 25000] },
+  chain: { size: 20, site: 'a high-traffic drive-thru lot', permit: ['Franchise fee & permits', 120000] },
+};
+const restoSitePrice = (t) => t.rent * 600;
+function restoBills(r, guests) {
+  const t = RT[r.type], z = REST_SITE[r.type].size;
+  return makeBills(r.site,
+    { elec: 8 * z, water: 3 * z, gas: 4 * z, net: 3 + z, waste: 2 * z },
+    { elec: 0.06 * guests, water: 0.05 * guests, gas: 0.08 * guests, waste: 0.02 * guests },
+    r.insured, t.cost * (1 + 0.5 * (r.level - 1)));
+}
 
 const restoById = (id) => S.restaurants.find((r) => r.id === +id);
-function restoValue(r) { return RT[r.type].cost * 0.55 * (0.6 + r.rep / 100) * (1 + 0.25 * (r.level - 1)); }
+function restoValue(r) { return RT[r.type].cost * 0.55 * (0.6 + r.rep / 100) * (1 + 0.25 * (r.level - 1)) + siteValue(r.site); }
 function restoWages(r) {
   const wm = RT[r.type].wageMult || 1;
   return Object.keys(ROLES).reduce((s, k) => s + r.staff[k] * ROLES[k].wage * wm, 0);
@@ -43,6 +60,7 @@ const BOTTLENECK = {
 registerModule({
   id: 'restaurants',
   init(s) { s.restaurants = []; },
+  migrate(s) { for (const r of s.restaurants) { if (!r.site) r.site = { own: false, rent: RT[r.type].rent, price: restoSitePrice(RT[r.type]), deposit: 0 }; if (r.insured === undefined) r.insured = true; } },
   assets(a) { a.restaurants = S.restaurants.reduce((t, r) => t + restoValue(r), 0); },
   daily() {
     const weekend = isWeekend();
@@ -82,7 +100,9 @@ registerModule({
       }
       if (r.marketing > 0) r.marketing--;
 
-      spend(t.rent, 'Restaurants');
+      const bills = restoBills(r, served);
+      payBills(bills);
+      r.bills = bills;
       const wages = restoWages(r);
       if (wages > 0) {
         if (canAfford(wages)) {
@@ -103,7 +123,7 @@ registerModule({
           if (quit) { r.staff[k] -= quit; log(`😠 ${quit} ${ROLES[k].name.toLowerCase()}(s) quit ${esc(r.name)} over low morale.`, 'bad'); }
         }
       }
-      const profit = revenue - ingr - t.rent - wages;
+      const profit = revenue - ingr - billsTotal(bills) - wages;
       r.last = { served, demand: Math.round(demand), revenue, profit, bottleneck };
       r.hist.push(profit);
       if (r.hist.length > 60) r.hist.shift();
@@ -113,16 +133,21 @@ registerModule({
   tabs: [{ id: 'resto', name: 'Restaurants', icon: '🍽️', render: renderRestaurants }],
   actions: {
     openResto(a) {
-      const t = RT[a];
-      if (!pay(t.cost, 'Investments', t.name)) return;
-      const used = S.restaurants.map((r) => r.name);
-      const name = pick(REST_NAMES.filter((n) => !used.includes(n))) || `${t.name} #${S.restaurants.length + 1}`;
-      S.restaurants.push({
-        id: uid(), type: t.id, name, level: 1, price: t.basePrice, quality: 'std', rep: 30, clean: 80, morale: 80,
-        marketing: 0, closed: 0, unpaid: 0, selfShift: false, staff: { cook: 0, waiter: 0, cleaner: 0, manager: 0 }, hist: [], last: null,
+      const t = RT[a], z = REST_SITE[a];
+      openBusiness({
+        title: t.name, icon: t.icon, equipment: t.cost, permit: { name: z.permit[0], cost: z.permit[1] }, rent: t.rent, price: restoSitePrice(t),
+        extra: `<p class="small muted">Premises: ${z.site}.</p>`,
+        done(site) {
+          const used = S.restaurants.map((r) => r.name);
+          const name = pick(REST_NAMES.filter((n) => !used.includes(n))) || `${t.name} #${S.restaurants.length + 1}`;
+          S.restaurants.push({
+            id: uid(), type: t.id, name, level: 1, price: t.basePrice, quality: 'std', rep: 30, clean: 80, morale: 80, site, insured: true,
+            marketing: 0, closed: 0, unpaid: 0, selfShift: false, staff: { cook: 0, waiter: 0, cleaner: 0, manager: 0 }, hist: [], last: null, bills: null,
+          });
+          log(`🍽️ You opened ${t.icon} ${name} (${t.name}) and ${site.own ? 'bought' : 'rented'} the premises.`, 'good');
+          toast(`Opened ${name}! Hire some staff.`, 'good');
+        },
       });
-      log(`🍽️ You opened ${t.icon} ${name} (${t.name}) for ${money(t.cost)}.`, 'good');
-      toast(`Opened ${name}! Hire some staff.`, 'good');
     },
     hire(a, role) {
       const r = restoById(a), t = RT[r.type];
@@ -163,6 +188,8 @@ registerModule({
       r.level++; r.closed = Math.max(r.closed, 2);
       log(`🔨 ${esc(r.name)} renovated to level ${r.level}. Closed for 2 days.`);
     },
+    restoBuySite(a) { buySite(restoById(a).site); },
+    restoInsure(a) { const r = restoById(a); r.insured = !r.insured; },
     restoRename(a) {
       const r = restoById(a);
       const n = prompt('New restaurant name:', r.name);
@@ -171,7 +198,7 @@ registerModule({
     restoSell(a) {
       const r = restoById(a), v = restoValue(r);
       showModal({
-        title: `Sell ${esc(r.name)}?`, body: `<p>A buyer offers <b>${money(v)}</b>. All staff will be let go.</p>`,
+        title: `Sell ${esc(r.name)}?`, body: `<p>A buyer offers <b>${money(v)}</b>${r.site.own ? ' including the premises' : ' including your rent deposit back'}. All staff will be let go.</p>`,
         buttons: [
           { label: `Sell for ${money(v)}`, cls: 'danger', fn: () => {
             earn(v, 'Investments');
@@ -188,9 +215,10 @@ registerModule({
 function renderRestaurants() {
   const shop = REST_TYPES.map((t) => `<div class="card tight">
     <div class="row"><span class="big-ico">${t.icon}</span><div class="grow"><b>${t.name}</b>
-    <div class="small muted">${money(t.cost)} · rent ${money(t.rent)}/day · up to ${t.maxStaff} staff</div>
+    <div class="small muted">Equipment ${money(t.cost)} · ${REST_SITE[t.id].permit[0]} ${money(REST_SITE[t.id].permit[1])}</div>
+    <div class="small muted">Rent ${money(rentNow(t.rent))}/day or buy for ${money(restoSitePrice(t) * S.re.housing)} · up to ${t.maxStaff} staff</div>
     <div class="small muted">~${t.demand} guests/day · menu ~${money(t.basePrice)}</div></div></div>
-    <div style="margin-top:8px">${btn('Open', 'openResto', t.id, { cls: 'buy sm', disabled: !canAfford(t.cost) })}</div></div>`).join('');
+    <div style="margin-top:8px">${btn(`Open from ${money(t.cost + REST_SITE[t.id].permit[1] + t.rent * DEPOSIT_DAYS)}`, 'openResto', t.id, { cls: 'buy sm', disabled: !canAfford(t.cost + REST_SITE[t.id].permit[1] + t.rent * DEPOSIT_DAYS) })}</div></div>`).join('');
 
   const cards = S.restaurants.map((r) => {
     const t = RT[r.type], L = r.last;
@@ -204,7 +232,7 @@ function renderRestaurants() {
     return `<div class="card ${r.unpaid ? 'danger' : ''}">
       <div class="row between"><div class="row"><span class="big-ico">${t.icon}</span><div>
         <h3 style="margin:0">${esc(r.name)} <button class="btn sm" data-act="restoRename" data-a="${r.id}" title="Rename">✏️</button></h3>
-        <div class="small muted">${t.name} · Level ${r.level} · ${staffCount(r)}/${t.maxStaff} staff · wages ${money(restoWages(r))}/day + rent ${money(t.rent)}</div></div></div>
+        <div class="small muted">${t.name} · Level ${r.level} · ${staffCount(r)}/${t.maxStaff} staff · wages ${money(restoWages(r))}/day</div></div></div>
         <div class="row">${r.closed ? `<span class="pill bad">Closed ${r.closed}d</span>` : '<span class="pill good">Open</span>'}
         ${r.marketing ? `<span class="pill good">📣 ${r.marketing}d</span>` : ''}${btn('Sell', 'restoSell', r.id, { cls: 'sm' })}</div></div>
       <div class="grid g2" style="margin-top:10px">
@@ -213,6 +241,7 @@ function renderRestaurants() {
           ${L ? `<p class="small" style="margin-top:8px">Yesterday: <b>${L.served}</b> served / ${L.demand} wanted · revenue ${money(L.revenue)} · profit <b class="${cls(L.profit)}">${signMoney(L.profit)}</b></p>
           <p class="small ${L.bottleneck === 'demand' ? 'muted' : 'warn'}">🔎 ${BOTTLENECK[L.bottleneck]}</p>` : '<p class="small muted">No results yet. Hire staff, then wait for the day to end.</p>'}
           ${r.hist.length > 1 ? chart('resto' + r.id, r.hist, 60, { zero: true }) : ''}
+          <div class="small" style="margin-top:6px">${siteLabel(r.site)}</div>${billsHtml(r.bills)}
         </div>
         <div>
           <div class="row" style="margin-bottom:8px"><span class="small muted">Menu price</span>
@@ -228,11 +257,13 @@ function renderRestaurants() {
         ${btn(`📣 Marketing 7d (${money(mktCost)})`, 'restoMarketing', r.id, { cls: 'sm', disabled: !canAfford(mktCost) })}
         ${btn(`🎁 Staff bonus (${money(Math.max(100, restoWages(r) * 2))})`, 'restoBonus', r.id, { cls: 'sm' })}
         ${r.level < 3 ? btn(`🔨 Renovate (${money(renoCost)})`, 'restoRenovate', r.id, { cls: 'sm', disabled: !canAfford(renoCost) }) : '<span class="pill">Max level</span>'}
+        ${r.site.own ? '' : btn(`🔑 Buy premises (${money(sitePrice(r.site))})`, 'restoBuySite', r.id, { cls: 'sm', disabled: !canAfford(sitePrice(r.site)) })}
+        ${btn(r.insured ? '🛡️ Insured' : '⚠️ Uninsured', 'restoInsure', r.id, { cls: 'sm ' + (r.insured ? 'on' : ''), title: 'Insurance covers most of the repair bill after fires and disasters' })}
       </div></div>`;
   }).join('');
 
   return `<h2 class="section">🍽️ Restaurants</h2>
-  ${S.restaurants.length ? '' : '<div class="banner info">Start small: a <b>Food Truck</b> costs $4,000. You can even run it yourself by working shifts before you hire anyone.</div>'}
+  ${S.restaurants.length ? '' : '<div class="banner info">Start small: a <b>Food Truck</b> costs about $4,300 to open (truck, license and parking deposit). You can even run it yourself by working shifts before you hire anyone.</div>'}
   <div class="grid section">${cards}</div>
   <h4>Open a new venue</h4><div class="grid g3">${shop}</div>`;
 }

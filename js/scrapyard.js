@@ -12,6 +12,11 @@ const YARD_LEVELS = [
 ];
 const YARD_WAGE = 95;
 const YARD_WORK_ENERGY = 20;
+const YARD_RENT = 60, YARD_LAND = 36000, YARD_PERMIT = ['Salvage & environmental permit', 2500];
+function yardBills(units) {
+  const y = S.yard, z = 1 + y.level * 0.5;
+  return makeBills(y.site, { elec: 10 * z, water: 4 * z, net: 4, waste: 6 * z }, { elec: units * 3, water: units, waste: units * 2 }, y.insured, YARD_COST + YARD_LEVELS.slice(1, y.level + 1).reduce((t, l) => t + l.cost, 0));
+}
 const JUNK = [
   { name: "'98 Full-size Pickup", kg: 1900, parts: 900, resale: 6500 },
   { name: "'03 Compact Hatchback", kg: 1200, parts: 700, resale: 4800 },
@@ -46,6 +51,7 @@ function doYardWork(units) {
     if (units <= 0) break;
     if (c.status === 'ready') continue;
     const use = Math.min(units, c.work - c.done);
+    S.yard.worked += use;
     c.done += use; units -= use;
     if (c.done >= c.work - 1e-9) finishCar(c);
   }
@@ -70,16 +76,17 @@ function finishCar(c) {
 registerModule({
   id: 'scrapyard',
   init(s) {
-    s.yard = { owned: false, level: 0, workers: 0, cars: [], metal: 0, metalPrice: 0.32, metalHist: [], offers: [], closed: 0 };
+    s.yard = { owned: false, level: 0, workers: 0, cars: [], metal: 0, metalPrice: 0.32, metalHist: [], offers: [], closed: 0, site: null, insured: true, bills: null, worked: 0 };
     let m = 0.32;
     for (let i = 0; i < 60; i++) { m = clamp(m + 0.05 * (0.32 - m) + 0.012 * gauss(), 0.12, 0.8); s.yard.metalHist.push(m); }
     s.yard.metalPrice = m;
   },
   start() { genOffers(); },
+  migrate(s) { if (s.yard.owned && !s.yard.site) s.yard.site = { own: false, rent: YARD_RENT, price: YARD_LAND, deposit: 0 }; },
   assets(a) {
     const y = S.yard;
     if (!y.owned) { a.scrapyard = 0; return; }
-    let v = YARD_COST * 0.6;
+    let v = YARD_COST * 0.6 + siteValue(y.site);
     for (let i = 1; i <= y.level; i++) v += YARD_LEVELS[i].cost * 0.5;
     v += y.metal * y.metalPrice;
     for (const c of y.cars) v += c.status === 'ready' ? c.sale * 0.9 : c.paid * 0.8;
@@ -104,16 +111,26 @@ registerModule({
     }
     if (y.closed > 0) y.closed--;
     else if (paid) doYardWork(y.workers * 2 * yardLevel().speed);
+    y.bills = yardBills(y.worked);
+    payBills(y.bills);
+    y.worked = 0;
     genOffers();
     if (chance(0.03)) { y.offers.push(makeOffer(RARE_JUNK)); log('✨ A rare barn-find muscle car is up at the scrap auction today!', 'good'); }
   },
   tabs: [{ id: 'yard', name: 'Scrapyard', icon: '🚗', render: renderYard }],
   actions: {
     buyYard() {
-      if (!pay(YARD_COST, 'Investments', 'the scrapyard')) return;
-      S.yard.owned = true;
-      log('🐕 You bought a scrapyard!', 'good');
+      openBusiness({
+        title: 'a Scrapyard', icon: '🚗', equipment: YARD_COST, permit: { name: YARD_PERMIT[0], cost: YARD_PERMIT[1] }, rent: YARD_RENT, price: YARD_LAND,
+        extra: '<p class="small muted">Equipment: crusher, tow truck and tools. Premises: a fenced industrial lot.</p>',
+        done(site) {
+          Object.assign(S.yard, { owned: true, site, insured: true });
+          log(`🐕 You opened a scrapyard on ${site.own ? 'land you bought' : 'a rented lot'}!`, 'good');
+        },
+      });
     },
+    yardBuySite() { buySite(S.yard.site); },
+    yardInsure() { S.yard.insured = !S.yard.insured; },
     yardUpgrade() {
       const y = S.yard, next = YARD_LEVELS[y.level + 1];
       if (!next || !pay(next.cost, 'Investments', 'the upgrade')) return;
@@ -164,10 +181,12 @@ registerModule({
 function renderYard() {
   const y = S.yard;
   if (!y.owned) {
-    return `<h2 class="section">🚗 Scrapyard</h2><div class="card hl" style="max-width:560px"><h3>Buy a scrapyard: ${money(YARD_COST)}</h3>
+    const up = YARD_COST + YARD_PERMIT[1] + YARD_RENT * DEPOSIT_DAYS;
+    return `<h2 class="section">🚗 Scrapyard</h2><div class="card hl" style="max-width:560px"><h3>Open a scrapyard from ${money(up)}</h3>
+      <p class="small muted">Equipment ${money(YARD_COST)} · ${YARD_PERMIT[0]} ${money(YARD_PERMIT[1])} · rent the lot for ${money(rentNow(YARD_RENT))}/day or buy it for ${money(YARD_LAND * S.re.housing)} · plus utilities</p>
       <p>Buy junk cars at auction, crush them for scrap metal and sell salvaged parts. Fix up the good ones and flip them for a profit.</p>
       <ul class="small muted"><li>Scrap metal price changes daily. Sell when it's high.</li><li>Hire workers or do the work yourself.</li><li>Rare barn finds show up now and then.</li></ul>
-      ${btn(`Buy scrapyard (${money(YARD_COST)})`, 'buyYard', '', { cls: 'primary', disabled: !canAfford(YARD_COST) })}</div>`;
+      ${btn('Open a scrapyard…', 'buyYard', '', { cls: 'primary', disabled: !canAfford(up) })}</div>`;
   }
   const L = yardLevel(), next = YARD_LEVELS[y.level + 1];
   const offers = y.offers.map((c) => `<div class="list-item"><span class="big-ico">🚙</span><div class="grow"><b>${c.name}</b>
@@ -187,6 +206,9 @@ function renderYard() {
       <div class="small">@ ${price(y.metalPrice)}/kg = ${money(y.metal * y.metalPrice)}</div>${btn('Sell metal', 'sellMetal', '', { cls: 'sm sell', disabled: y.metal <= 0 })}</div>
     <div class="card kpi"><div class="lbl">Upgrade</div>${next ? `<div class="small muted">Room for ${next.cap} cars, speed ×${next.speed}</div>${btn(`Upgrade (${money(next.cost)})`, 'yardUpgrade', '', { cls: 'sm', disabled: !canAfford(next.cost) })}` : '<div class="val">MAX</div>'}</div>
   </div>
+  <div class="card section tight"><div class="row between"><div><div class="small">${siteLabel(y.site)}</div>${billsHtml(y.bills)}</div>
+    <div class="row">${y.site.own ? '' : btn(`🔑 Buy the lot (${money(sitePrice(y.site))})`, 'yardBuySite', '', { cls: 'sm', disabled: !canAfford(sitePrice(y.site)) })}
+    ${btn(y.insured ? '🛡️ Insured' : '⚠️ Uninsured', 'yardInsure', '', { cls: 'sm ' + (y.insured ? 'on' : '') })}</div></div></div>
   <div class="card section"><h3>Scrap metal price ($/kg)</h3>${chart('metal', y.metalHist, 90, { labels: true })}</div>
   <div class="grid g2">
     <div class="card"><div class="row between"><h3>Today's junk auction</h3></div>${offers || '<p class="muted">Sold out. New cars tomorrow.</p>'}</div>

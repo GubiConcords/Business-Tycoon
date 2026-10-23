@@ -5,7 +5,7 @@
    ===================================================================== */
 const LOAN_RATE = 0.0012;     // per day
 const SAVINGS_RATE = 0.00025; // per day
-const TAX_CATS = ['Restaurants', 'Factories', 'Scrapyard', 'Real Estate', 'Racing', 'Wages', 'Marketing'];
+const TAX_CATS = ['Restaurants', 'Factories', 'Scrapyard', 'Real Estate', 'Racing', 'Wages', 'Marketing', 'Rent', 'Utilities', 'Insurance'];
 const TAX_MODES = {
   honest: { name: 'Honest', icon: '😇', rate: 0.2, risk: -6, desc: 'Pay the full 20%. Audit risk slowly falls.' },
   creative: { name: 'Creative accounting', icon: '🤫', rate: 0.12, risk: 7, desc: 'Fudge the books and pay 12%. Audit risk builds every week.' },
