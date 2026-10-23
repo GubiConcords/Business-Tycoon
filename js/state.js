@@ -49,7 +49,7 @@ const isWeekend = (d = S.day) => (d - 1) % 7 >= 5;
 const ASSET_LABELS = {
   cash: 'Cash', savings: 'Savings', stocks: 'Stocks', crypto: 'Crypto', startups: 'Startups',
   restaurants: 'Restaurants', factories: 'Factories', inventory: 'Warehouse', scrapyard: 'Scrapyard',
-  property: 'Real estate', racing: 'Race cars', loan: 'Loans',
+  property: 'Real estate', racing: 'Race cars', ai: 'AI & data centers', ventures: 'Joint ventures', loan: 'Loans',
 };
 function assets() {
   const a = { cash: S.cash };

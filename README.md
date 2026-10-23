@@ -12,6 +12,8 @@ A browser business simulator. You start with **$5,000** and build an empire any 
 | 🧪 **Startups** | Angel-invest in pitches. Most fail, a few return 10–60× |
 | 🍽️ **Restaurants** | Food truck → café → diner → sushi → fine dining → burger franchise. Hire and pay cooks, waiters, cleaners and managers. Set prices and ingredient quality, run marketing, renovate, or work shifts yourself |
 | 🏭 **Factories & R&D** | Commodity plants (plastic, steel, aluminum, wire, wafers, glass, batteries, cups, toys) feed a **Design Studio** where you create your own products and pay R&D to develop them: **chips** (28nm→3nm, Efficient / Balanced / Super chip, 2–16 cores), **car engines** (I4, V6, V8, electric), **jet engines** (15k–100k lbf; turbojet, turbofan or geared), **cars**, **phones** and **aircraft** (50–600 seats, range, twin or four engines). Use your own parts or buy off-the-shelf ones (stock engines, licensed turbofans, generic chips). Most products need **certification** before production (FAA type certificate for aircraft, FAA engine certification, safety & emissions, FCC), and certification can fail. Each design needs its own production line, and the chip fab must be upgraded for smaller process nodes. Prices drop as you flood the market with one design, so a range of designs sells best |
+| 🤝 **Deals & diplomacy** | Sign **supply contracts** with other companies (deliver goods or your own designed products on schedule, above market price), bid on **government tenders** from six fictional countries, run **AI service contracts**, start **joint ventures** that track a partner's stock, and build relations with business lunches, trade missions and liaison offices. **Trade agreements** cut commodity prices (up to 15%). Missed deliveries earn strikes and penalties, and political crises can void government deals overnight |
+| 🤖 **AI Lab** | Open an AI Lab HQ, hire **software engineers, ML researchers and data engineers** (they produce research points), license training data, and open **data centers** (server room → hyperscale campus, rented or bought, with big power and cooling bills). Fill them with **GPU servers** or servers **built from your own chip designs**. **Train models** from Tiny to Frontier, sell an AI product to users, take AI contracts and, once capable enough, use your AI **as your own employees**: it works your 9–5 shifts and replaces restaurant, scrapyard and factory staff and even your AI researchers |
 | 🚗 **Scrapyard** | Buy junk cars at auction, crush them for metal and parts, or repair and flip them. Rare barn finds show up now and then |
 | 🏘️ **Real estate** | Buy property, set rent levels, keep tenants happy, renovate, evict, or develop new buildings from scratch |
 | 🏎️ **Racing** | Buy and tune cars and enter races, from track days to the Grand Prix. Bet on yourself or hire a pro driver. Underground races pay more but can get raided by police |
@@ -44,6 +46,8 @@ js/realestate.js  property & landlord
 js/racing.js      racing & race betting
 js/casino.js      casino games
 js/finance.js     bank, taxes & audits
+js/ai.js          AI lab, data centers, model training, AI employees
+js/deals.js       contracts, government tenders, joint ventures, diplomacy
 js/job.js         the 9–5 clicker job
 js/main.js        dashboard, events, achievements, day loop, rendering
 ```

@@ -75,6 +75,14 @@ registerModule({
   daily() {
     const J = S.job;
     if (J.clockedIn) J.days++;
+    // your AI clone finishes any part of the shift you didn't work
+    if (aiDoesJob() && J.today < SHIFT_CLICKS) {
+      let pay = 0;
+      for (let i = J.today; i < SHIFT_CLICKS; i++) { pay += jobRank().pay; J.clicks++; }
+      J.total += pay;
+      earn(pay, 'Salary');
+      stat('aiShifts');
+    }
     J.today = 0; J.earnedToday = 0; J.clockedIn = false;
   },
   tabs: [{ id: 'job', name: '9–5 Job', icon: '💼', render: renderJob, after: jobUpdate, tick: jobUpdate, live: false }],

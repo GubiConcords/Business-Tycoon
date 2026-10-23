@@ -242,7 +242,7 @@ function componentOptions(list) {
 }
 
 const gPrice = (g) => GOODS[g].base * S.goods[g].idx;
-const buyPrice = (g) => gPrice(g) * (1 + SPREAD);
+const buyPrice = (g) => gPrice(g) * (1 + SPREAD) * (1 - tradeDiscount());
 const sellPrice = (g) => gPrice(g) * (1 - SPREAD);
 const fmtU = (q) => (q % 1 ? q.toFixed(2) : fmtInt(q));
 function tradeGood(g, qty) {
@@ -306,9 +306,10 @@ function facRate(f) {
 }
 function facOpex(f) {
   const lvl = 1 + 0.4 * (f.level - 1), cut = f.safety === 'cut' ? 0.7 : 1;
-  if (f.kind !== 'line') return RCP[f.good].opex * lvl * cut;
+  const ai = aiWageMult('factory');
+  if (f.kind !== 'line') return RCP[f.good].opex * lvl * cut * ai;
   const d = facDesign(f);
-  return DCATS[f.cat].opex * (d ? d.opexMult : 0.3) * lvl * cut;
+  return DCATS[f.cat].opex * (d ? d.opexMult : 0.3) * lvl * cut * ai;
 }
 const facUpgradeCost = (f) => facDef(f).cost * 0.6 * f.level;
 function facEquipment(f) {
@@ -319,7 +320,7 @@ function facEquipment(f) {
 const facValue = (f) => facEquipment(f) * 0.5 + siteValue(f.site);
 // load: 1 = running, lower when paused/idle; made: units produced today
 function facBills(f, load, made) {
-  const o = facOpex(f) / (f.safety === 'cut' ? 0.7 : 1);
+  const o = facOpex(f) / (f.safety === 'cut' ? 0.7 : 1) / aiWageMult('factory');
   const use = { elec: 0, water: 0 };
   if (made) {
     if (f.kind === 'line') {
@@ -347,6 +348,7 @@ function dailyNeeds() {
     const n = Math.ceil(facRate(f));
     for (const [ref, q] of Object.entries(facBom(f))) need[ref] = (need[ref] || 0) + q * n;
   }
+  for (const [ref, q] of Object.entries(contractReserve())) need[ref] = (need[ref] || 0) + q;
   return need;
 }
 function produce(f) {

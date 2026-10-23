@@ -98,7 +98,7 @@ registerModule({
     y.metalHist.push(y.metalPrice);
     if (y.metalHist.length > 90) y.metalHist.shift();
     if (!y.owned) { genOffers(); return; }
-    const wages = y.workers * YARD_WAGE;
+    const wages = y.workers * YARD_WAGE * aiWageMult('yard');
     let paid = true;
     if (wages) {
       if (canAfford(wages)) spend(wages, 'Wages');

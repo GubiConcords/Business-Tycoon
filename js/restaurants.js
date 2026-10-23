@@ -103,7 +103,7 @@ registerModule({
       const bills = restoBills(r, served);
       payBills(bills);
       r.bills = bills;
-      const wages = restoWages(r);
+      const wages = restoWages(r) * aiWageMult('resto');
       if (wages > 0) {
         if (canAfford(wages)) {
           spend(wages, 'Wages');

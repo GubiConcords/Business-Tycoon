@@ -2,7 +2,7 @@
 /* =====================================================================
    Main: dashboard, log & awards, random events, day loop, rendering
    ===================================================================== */
-const TAB_ORDER = ['dash', 'job', 'stocks', 'crypto', 'startups', 'resto', 'factories', 'yard', 'realestate', 'racing', 'casino', 'bank', 'taxes', 'log'];
+const TAB_ORDER = ['dash', 'job', 'stocks', 'crypto', 'startups', 'resto', 'factories', 'deals', 'ai', 'yard', 'realestate', 'racing', 'casino', 'bank', 'taxes', 'log'];
 const HUSTLES = [
   { id: 'odd', name: 'Odd jobs', icon: '🧹', energy: 30, pay: [90, 160] },
   { id: 'deliver', name: 'Deliver food', icon: '🛵', energy: 40, pay: [140, 230] },
@@ -42,6 +42,12 @@ const ACH = [
   ['nw10m', '🏦', 'Multi-Millionaire', 'Net worth of $10M', () => netWorth() >= 1e7],
   ['nw100m', '👑', 'Tycoon', 'Net worth of $100M', () => netWorth() >= 1e8],
   ['nw1b', '🚀', 'Billionaire', 'Net worth of $1B', () => netWorth() >= 1e9],
+  ['contract', '✍️', 'Signed & Sealed', 'Complete a supply contract', () => S.deals.done > 0],
+  ['gov', '🏛️', 'Government Contractor', 'Win a government tender', () => S.stats.govContracts > 0],
+  ['tradedeal', '📜', 'Free Trader', 'Sign a trade agreement with a country', () => S.stats.tradeDeals > 0],
+  ['aimodel', '🤖', 'Hello, World', 'Train your first AI model', () => S.stats.aiModels > 0],
+  ['agi', '🧠', 'Singularity', 'Deploy an AI with capability 85+', () => aiCap() >= 85],
+  ['automate', '🦾', 'Lights Out', 'Let your AI replace human workers', () => Object.entries(S.ai.auto).some(([k, v]) => v && (S.ai.cover[k] || 0) > 0)],
   ['vp', '👔', 'Corner Office', 'Get promoted to Vice President at your 9–5', () => S.job.clicks >= 40000],
   ['honest', '😇', 'Honest Tycoon', 'Reach $1M having only ever paid taxes honestly', () => netWorth() >= 1e6 && !S.stats.dodgedTaxes],
 ];
@@ -180,6 +186,8 @@ function showIntro() {
         <li>🏎️ <b>Racing</b>: tune cars, win prize money, bet on yourself (underground races pay more, but the police might show up)</li>
         <li>🎰 <b>Casino</b>: Plinko, slots, roulette, blackjack, crash, dice and the lottery</li>
         <li>🧾 <b>Taxes</b>: pay honestly, or cook the books and risk an audit</li>
+        <li>🤝 <b>Deals &amp; diplomacy</b>: supply contracts with companies, government tenders, joint ventures and trade agreements</li>
+        <li>🤖 <b>AI Lab</b>: hire programmers, build data centers, train your own AI, sell it, and let it replace your employees</li>
         <li>💼 <b>A 9–5 job</b>: click to work, starting at 1¢ per click. Get promoted up to 40¢.</li>
         <li>🏢 <b>Running costs</b>: every business needs premises (rent or buy), a permit, and pays for electricity, water, gas, internet, waste and insurance. You also pay your own living costs.</li>
       </ul>
