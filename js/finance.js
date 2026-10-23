@@ -5,7 +5,7 @@
    ===================================================================== */
 const LOAN_RATE = 0.0012;     // per day
 const SAVINGS_RATE = 0.00025; // per day
-const TAX_CATS = ['Restaurants', 'Factories', 'Scrapyard', 'Real Estate', 'Racing', 'Wages', 'Marketing', 'Rent', 'Utilities', 'Insurance', 'Contracts', 'AI', 'Ventures'];
+const TAX_CATS = ['Restaurants', 'Factories', 'Scrapyard', 'Real Estate', 'Racing', 'Wages', 'Marketing', 'Rent', 'Utilities', 'Insurance', 'Contracts', 'AI', 'Ventures', 'Legal', 'Space'];
 const TAX_MODES = {
   honest: { name: 'Honest', icon: '😇', rate: 0.2, risk: -6, desc: 'Pay the full 20%. Audit risk slowly falls.' },
   creative: { name: 'Creative accounting', icon: '🤫', rate: 0.12, risk: 7, desc: 'Fudge the books and pay 12%. Audit risk builds every week.' },
@@ -16,6 +16,7 @@ const ACCOUNTANT_WAGE = 400;
 
 const loanLimit = () => Math.max(15000, (netWorth() + S.bank.loan) * 0.5);
 function addRisk(n) {
+  if (n > 0 && S.legal && S.legal.staff.compliance) n *= 0.7;
   S.tax.risk = clamp(S.tax.risk + (n > 0 && S.tax.accountant ? n * 0.5 : n), 0, 100);
 }
 function bankAmount(max) {
@@ -26,7 +27,7 @@ function runAudit() {
   const T = S.tax;
   T.audits++;
   if (T.evaded > 1) {
-    const fine = Math.round((T.evaded * 2.5 + 10000) * (T.accountant ? 0.7 : 1));
+    const fine = Math.round((T.evaded * 2.5 + 10000) * (T.accountant ? 0.7 : 1) * legalFineMult());
     spend(fine, 'Fines');
     log(`🕵️ TAX AUDIT! Investigators found ${money(T.evaded)} in unpaid taxes. Fine: ${money(fine)}.`, 'bad');
     showModal({

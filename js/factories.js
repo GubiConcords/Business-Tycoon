@@ -193,18 +193,19 @@ const DCATS = {
       ['count', 'Engines', [['2', 'Twin-engine'], ['4', 'Four-engine']]],
       ['engine', 'Engine model', 'jetEngines'],
       ['chip', 'Avionics chip', 'chips'],
+      ['avionics', 'Avionics suite', 'avionicsList'],
     ],
     compute(p) {
       const seats = +p.seats, n = +p.count, r = { short: [1, 1], med: [1.3, 1.2], long: [1.7, 1.5] }[p.range];
-      const es = refSpec(p.engine), cs = refSpec(p.chip);
+      const es = refSpec(p.engine), cs = refSpec(p.chip), av = refSpec(p.avionics || 'avionicsStd');
       const need = Math.round(seats * 0.25 * r[1]), have = n * es.thrust;
       let eff = es.eff * (n === 2 ? 1.05 : 0.95) * (1 + (cs.eff - 1) * 0.03);
       if (have > need * 2) eff *= 0.75;
-      const rel = clamp(es.rel + (n === 4 ? 0.02 : 0) + Math.min(0.02, (cs.perf - 4) * 0.001), 0, 0.995);
+      const rel = clamp(es.rel + (n === 4 ? 0.02 : 0) + Math.min(0.02, (cs.perf - 4) * 0.001) + (av.rel - 0.96), 0, 0.995);
       return {
         stats: { seats, range: p.range, eff, rel, thrust: have, need },
-        valueAdd: seats * 90000 * r[0] * (0.7 + 0.3 * eff) * (0.5 + rel / 2),
-        bom: { alu: seats * 12, steel: seats * 3, plastic: seats * 4, glass: seats, wire: seats * 2, [p.engine]: n, [p.chip]: 10 + Math.round(seats / 20) },
+        valueAdd: seats * 90000 * r[0] * (0.7 + 0.3 * eff) * (0.5 + rel / 2) * (0.9 + 0.1 * av.tech),
+        bom: { alu: seats * 12, steel: seats * 3, plastic: seats * 4, glass: seats, wire: seats * 2, [p.engine]: n, [p.chip]: 10 + Math.round(seats / 20), [p.avionics || 'avionicsStd']: 1 },
         rateMult: 1 / (10 + seats / 20), opexMult: 0.5 + seats / 360, rnd: seats * 150000 * r[0], days: Math.round(40 + seats / 10),
         cert: { cost: 3000000 + seats * 40000 * r[0], days: Math.round(60 + seats / 10), pass: clamp(0.4 + (rel - 0.9) * 6 + (cs.perf >= 16 ? 0.1 : 0), 0.2, 0.95) },
         error: have < need ? `Underpowered: needs ${need}k lbf of total thrust, but ${n} engines only give ${have}k lbf.` : '',
@@ -437,7 +438,7 @@ registerModule({
         stat('designs');
         log(`🧪 R&D complete: ${esc(d.name)} ${d.cert ? `is ready to apply for ${DCATS[d.cat].cert}.` : 'is ready for production!'}`, 'good');
         toast(`🧪 ${esc(d.name)} design complete!`, 'good');
-      } else if (chance(d.cert.pass)) {
+      } else if (chance(Math.min(0.98, d.cert.pass + regulatoryBonus()))) {
         d.status = 'approved';
         if (d.cat === 'aircraft') stat('faa');
         log(`✅ ${esc(d.name)} received its ${DCATS[d.cat].cert}! Production can begin.`, 'good');
@@ -471,8 +472,8 @@ registerModule({
 
       if (f.safety === 'cut') {
         addRisk(0.25);
-        if (chance(0.007)) {
-          const fine = Math.round(def.cost * 0.06), repair = Math.round(def.cost * 0.1 * (f.insured ? 0.1 : 1));
+        if (chance(0.007 * (S.legal.staff.compliance ? 0.6 : 1))) {
+          const fine = Math.round(def.cost * 0.06 * legalFineMult()), repair = Math.round(def.cost * 0.1 * (f.insured ? 0.1 : 1));
           spend(fine, 'Fines');
           spend(repair, 'Factories');
           f.closed = 3;
@@ -510,6 +511,7 @@ registerModule({
     },
     buildLine(cat) {
       const c = DCATS[cat], pm = LINE_PERMIT[cat];
+      if (c.lock && !c.lock.test()) return toast(c.lock.msg, 'warn');
       openBusiness({
         title: c.factory, icon: c.icon, equipment: c.facCost, permit: { name: pm[0], cost: pm[1] },
         rent: facSiteRent(c.facCost), price: facSiteRent(c.facCost) * 600,
@@ -568,6 +570,7 @@ registerModule({
     startDesign() {
       const cat = UI.dzCat, p = { ...dzParams(cat) }, r = evalDesign(cat, p);
       if (r.error) return toast(r.error, 'bad');
+      if (DCATS[cat].lock && !DCATS[cat].lock.test()) return toast(DCATS[cat].lock.msg, 'warn');
       const name = (prompt(`Name your new ${DCATS[cat].name.replace(/s$/, '').toLowerCase()} design:`, DCATS[cat].autoName(p)) || '').trim().slice(0, 40);
       if (!name) return;
       if (!pay(r.rnd, 'R&D', 'R&D')) return;
@@ -674,7 +677,7 @@ function renderBuild() {
   const lines = Object.entries(DCATS).map(([k, c]) => `<div class="card tight"><div class="row"><span class="big-ico">${c.icon}</span><div class="grow"><b>${c.factory}</b>
     <div class="small muted">Builds your own ${c.name.toLowerCase()} designs${c.cert ? ` · products need ${c.cert}` : ''}</div></div></div>
     <div class="small muted" style="margin:6px 0">Equipment ${money(c.facCost)} · 📄 ${LINE_PERMIT[k][0]} ${money(LINE_PERMIT[k][1])} · site rent ${money(rentNow(facSiteRent(c.facCost)))}/day · base operating cost ${money(c.opex)}/day${k === 'chip' ? ' · upgrade the fab to unlock smaller process nodes' : ''}</div>
-    ${btn(`Open from ${money(c.facCost + LINE_PERMIT[k][1] + facSiteRent(c.facCost) * DEPOSIT_DAYS)}`, 'buildLine', k, { cls: 'buy sm', disabled: !canAfford(c.facCost + LINE_PERMIT[k][1] + facSiteRent(c.facCost) * DEPOSIT_DAYS) })}</div>`).join('');
+    ${c.lock && !c.lock.test() ? `<span class="pill">🔒 ${c.lock.msg}</span>` : btn(`Open from ${money(c.facCost + LINE_PERMIT[k][1] + facSiteRent(c.facCost) * DEPOSIT_DAYS)}`, 'buildLine', k, { cls: 'buy sm', disabled: !canAfford(c.facCost + LINE_PERMIT[k][1] + facSiteRent(c.facCost) * DEPOSIT_DAYS) })}</div>`).join('');
   return `<h4>Product lines (for your own designs)</h4><div class="grid g3 section">${lines}</div>${fixed}`;
 }
 
@@ -687,7 +690,9 @@ function renderStudio() {
   const rate = c.rate * r.rateMult;
   const bomRows = Object.entries(r.bom).map(([ref, q]) => `<tr><td>${refIcon(ref)} ${esc(refName(ref))}${isD(ref) ? ' <span class="pill good">yours</span>' : ''}</td><td class="num">${fmtU(q)}</td><td class="num">${isD(ref) ? '<span class="small muted">own production</span>' : money(q * buyPrice(ref))}</td></tr>`).join('');
   const costTotal = r.rnd + (r.cert ? r.cert.cost : 0);
-  return `<div class="section" style="overflow-x:auto">${seg(Object.entries(DCATS).map(([k, x]) => [k, `${x.icon} ${x.name}`]), cat, 'dzCat')}</div>
+  const groups = [['Parts', ['chip', 'carEngine', 'jetEngine', 'avionics', 'radar', 'armor', 'rotor']], ['Products', ['car', 'phone', 'aircraft']], ['Military', ['helicopter', 'tank', 'fighter', 'bomber']], ['Space', ['rocketEngine', 'rocket', 'satellite', 'capsule']]];
+  return `${groups.map(([g, ks]) => `<div class="row section" style="margin-bottom:6px"><span class="small muted" style="width:70px">${g}</span><div class="seg wrap">${ks.map((k) => btn(`${DCATS[k].icon} ${DCATS[k].name}`, 'dzCat', k, { cls: 'sm ' + (k === cat ? 'on' : '') })).join('')}</div></div>`).join('')}
+  ${c.lock && !c.lock.test() ? `<div class="banner warn small">🔒 ${c.lock.msg} You can still sketch designs here.</div>` : ''}
   <div class="grid g2">
     <div class="card"><h3>${c.icon} New ${c.name.replace(/s$/, '').toLowerCase()} design</h3>${rows}
       ${typeof c.params.find((x) => typeof x[2] === 'string') !== 'undefined' ? '<p class="small muted">⭐ = your own approved designs. Use your own parts or buy off-the-shelf ones.</p>' : ''}</div>
@@ -707,7 +712,7 @@ function renderStudio() {
         🏭 Needs a <b>${c.factory}</b> (${money(c.facCost)} equipment + ${LINE_PERMIT[cat][0]} ${money(LINE_PERMIT[cat][1])} + site)${r.minLevel > 1 ? ` at level ${r.minLevel}+` : ''}<br>
         Total before the first unit ships: <b>${money(costTotal + (S.factories.some((f) => f.cat === cat) ? 0 : c.facCost + LINE_PERMIT[cat][1] + facSiteRent(c.facCost) * DEPOSIT_DAYS))}</b>
       </div>
-      <div style="margin-top:10px">${btn(`🧪 Start R&D (${money(r.rnd)})`, 'startDesign', '', { cls: 'primary', disabled: !!r.error || !canAfford(r.rnd) })}</div>
+      <div style="margin-top:10px">${btn(`🧪 Start R&D (${money(r.rnd)})`, 'startDesign', '', { cls: 'primary', disabled: !!r.error || !canAfford(r.rnd) || (c.lock && !c.lock.test()) })}</div>
     </div>
   </div>`;
 }

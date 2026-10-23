@@ -81,6 +81,7 @@ function billsHtml(b) {
 /* ---------------------------- Opening flow ---------------------------- */
 // shows the rent-or-buy choice; done(site) runs after everything is paid
 function openBusiness({ title, icon = '', equipment, permit, rent, price, extra = '', done }) {
+  permit = { ...permit, cost: Math.round(permit.cost * permitMult()) };
   const rentUp = equipment + permit.cost + rent * DEPOSIT_DAYS;
   const buyUp = equipment + permit.cost + price * S.re.housing;
   const go = (own) => () => {

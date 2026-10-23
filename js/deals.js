@@ -17,6 +17,9 @@ const SUPPLY_GOODS = ['plastic', 'steel', 'alu', 'wire', 'wafer', 'glass', 'batt
 const SUPPLY_CATS = {
   chip: { every: 1, qty: [10, 40] }, phone: { every: 1, qty: [5, 15] }, carEngine: { every: 7, qty: [10, 30] },
   car: { every: 7, qty: [5, 20] }, jetEngine: { every: 30, qty: [1, 2] }, aircraft: { every: 30, qty: [1, 1] },
+  avionics: { every: 7, qty: [2, 6] }, radar: { every: 15, qty: [1, 3] }, armor: { every: 7, qty: [5, 15] }, rotor: { every: 15, qty: [2, 5] },
+  helicopter: { every: 30, qty: [1, 3] }, tank: { every: 15, qty: [2, 6] }, fighter: { every: 60, qty: [1, 2] }, bomber: { every: 90, qty: [1, 1] },
+  satellite: { every: 30, qty: [1, 2] },
 };
 const AI_JOBS = [
   ['Customer-service chatbots', 30], ['Fraud detection', 45], ['Logistics optimization', 50], ['Medical imaging analysis', 60],
@@ -67,7 +70,8 @@ function makeDealOffer(ptype) {
   const gov = ptype === 'gov';
   const party = gov ? pick(COUNTRIES).id : pick(STOCKS).sym;
   const scale = gov ? CTRY[party].wealth : 1;
-  const ownCats = Object.keys(SUPPLY_CATS).filter((c) => S.designs.some((d) => d.cat === c && d.status === 'approved'));
+  const allowed = Object.keys(SUPPLY_CATS).filter((c) => gov || !['helicopter', 'tank', 'fighter', 'bomber'].includes(c));
+  const ownCats = allowed.filter((c) => S.designs.some((d) => d.cat === c && d.status === 'approved'));
   const roll = Math.random();
   const o = { id: uid(), ptype, party, strikes: 0 };
   if (roll < (S.ai.deployed ? 0.25 : 0.1)) {
@@ -77,7 +81,7 @@ function makeDealOffer(ptype) {
       days: randInt(30, gov ? 120 : 60), daily: Math.round(minCap * minCap * rand(3, 6) * scale * (gov ? 1.5 : 1)),
     });
   } else {
-    const useCat = ownCats.length && chance(0.6) ? pick(ownCats) : chance(0.15) ? pick(Object.keys(SUPPLY_CATS)) : null;
+    const useCat = ownCats.length && chance(0.6) ? pick(ownCats) : chance(0.15) ? pick(allowed) : null;
     if (useCat) {
       const sc = SUPPLY_CATS[useCat];
       Object.assign(o, { kind: 'supply', cat: useCat, every: sc.every, qty: Math.ceil(randInt(...sc.qty) * (gov ? 1.5 : 1)), price: Math.round(catRefPrice(useCat) * rand(1.1, 1.3) * (gov ? 1.15 : 1)) });
@@ -121,6 +125,7 @@ function endContract(c, ok, msg) {
 }
 function strike(c, penalty, what) {
   c.strikes++;
+  penalty = Math.round(penalty * legalFineMult());
   if (penalty > 0) spend(penalty, 'Fines');
   addRel(c.party, -3);
   log(`⚠️ ${partyName(c)}: ${what}. Penalty ${money(penalty)} (strike ${c.strikes}/${DEAL_FAIL_LIMIT}).`, 'bad');

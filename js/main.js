@@ -2,7 +2,7 @@
 /* =====================================================================
    Main: dashboard, log & awards, random events, day loop, rendering
    ===================================================================== */
-const TAB_ORDER = ['dash', 'job', 'stocks', 'crypto', 'startups', 'resto', 'factories', 'deals', 'ai', 'yard', 'realestate', 'fleet', 'racing', 'casino', 'bank', 'taxes', 'log'];
+const TAB_ORDER = ['dash', 'job', 'stocks', 'crypto', 'startups', 'resto', 'factories', 'deals', 'ai', 'yard', 'realestate', 'fleet', 'space', 'racing', 'casino', 'bank', 'taxes', 'legal', 'log'];
 const HUSTLES = [
   { id: 'odd', name: 'Odd jobs', icon: '🧹', energy: 30, pay: [90, 160] },
   { id: 'deliver', name: 'Deliver food', icon: '🛵', energy: 40, pay: [140, 230] },
@@ -50,6 +50,14 @@ const ACH = [
   ['automate', '🦾', 'Lights Out', 'Let your AI replace human workers', () => Object.entries(S.ai.auto).some(([k, v]) => v && (S.ai.cover[k] || 0) > 0)],
   ['jetset', '🛩️', 'Jet Set', 'Own a private jet you can fly', () => hasJet()],
   ['collector', '🏎️', 'Collector', 'Own 10 cars and aircraft', () => S.fleet.vehicles.length >= 10],
+  ['lawyered', '⚖️', 'Lawyered Up', 'Retain an elite law firm', () => S.legal.firm === 'elite'],
+  ['defense', '🎖️', 'Defense Contractor', 'Build your own military vehicle', () => ['helicopter', 'tank', 'fighter', 'bomber'].some((k) => S.stats['made_' + k] > 0)],
+  ['spaceagency', '🚀', 'Space Agency', 'Found your own space agency', () => S.space.founded],
+  ['sorbit', '🛰️', 'To Orbit!', 'Put your first satellite in orbit', () => !!S.space.milestones.orbit],
+  ['screw', '🧑‍🚀', 'Astronaut Airline', 'Fly your first crewed mission', () => !!S.space.milestones.crewed],
+  ['station', '🛸', 'Home in Orbit', 'Complete your space station', () => !!S.space.milestones.station],
+  ['moon', '🌕', 'One Small Step', 'Land a crew on the Moon', () => !!S.space.milestones.moon],
+  ['mars', '🔴', 'Red Planet', 'Send a crew to Mars', () => !!S.space.milestones.mars],
   ['vp', '👔', 'Corner Office', 'Get promoted to Vice President at your 9–5', () => S.job.clicks >= 40000],
   ['honest', '😇', 'Honest Tycoon', 'Reach $1M having only ever paid taxes honestly', () => netWorth() >= 1e6 && !S.stats.dodgedTaxes],
 ];
@@ -109,10 +117,10 @@ const EVENTS = [
       body: `<p>A customer claims one of your businesses ruined their life and wants <b>${money(claim)}</b>.</p><p>You can settle, or fight in court (50/50 chance; losing costs ${money(lose)} plus legal fees).</p>`,
       buttons: [
         { label: `Settle for ${money(claim)}`, fn: () => { spend(claim, 'Fines'); log(`⚖️ You settled a lawsuit for ${money(claim)}.`); } },
-        { label: 'Fight it in court', cls: 'danger', fn: () => {
-          const fees = Math.round(claim * 0.2);
+        { label: `Fight it in court (${pct(lawsuitWin(), 0)} win chance)`, cls: 'danger', fn: () => {
+          const fees = Math.round(claim * 0.2 * (S.legal.firm === 'none' ? 1 : 0.3));
           spend(fees, 'Fines');
-          if (chance(0.5)) { log(`⚖️ You WON the lawsuit! Legal fees: ${money(fees)}.`, 'good'); toast('You won in court!', 'good'); }
+          if (chance(lawsuitWin())) { log(`⚖️ You WON the lawsuit! Legal fees: ${money(fees)}.`, 'good'); toast('You won in court!', 'good'); }
           else { spend(lose, 'Fines'); log(`⚖️ You LOST the lawsuit and paid ${money(lose + fees)}.`, 'bad'); toast('You lost in court.', 'bad'); }
         } },
       ],
@@ -191,6 +199,9 @@ function showIntro() {
         <li>🤝 <b>Deals &amp; diplomacy</b>: supply contracts with companies, government tenders, joint ventures and trade agreements</li>
         <li>🤖 <b>AI Lab</b>: hire programmers, build data centers, train your own AI, sell it, and let it replace your employees</li>
         <li>🛩️ <b>Garage &amp; hangar</b>: buy cars and private aircraft, or take your own designs for a spin</li>
+        <li>🎖️ <b>Defense</b>: design and build helicopters, tanks, fighter jets and bombers, plus all their parts</li>
+        <li>🚀 <b>Space agency</b>: rockets, satellites, space tourism, a space station, the Moon and Mars</li>
+        <li>⚖️ <b>Legal &amp; advisors</b>: hire better lawyers and specialists to cut fines and win lawsuits</li>
         <li>💼 <b>A 9–5 job</b>: click to work, starting at 1¢ per click. Get promoted up to 40¢.</li>
         <li>🏢 <b>Running costs</b>: every business needs premises (rent or buy), a permit, and pays for electricity, water, gas, internet, waste and insurance. You also pay your own living costs.</li>
       </ul>

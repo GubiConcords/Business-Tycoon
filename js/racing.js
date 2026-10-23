@@ -72,7 +72,7 @@ function runRace(evId) {
   stat('races');
 
   if (t.illegal && chance(0.12)) {
-    const fine = 10000 + t.entry * 2;
+    const fine = Math.round((10000 + t.entry * 2) * legalFineMult());
     spend(fine, 'Fines');
     car.impound = 5;
     addRisk(5);
